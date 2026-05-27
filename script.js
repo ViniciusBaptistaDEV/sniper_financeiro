@@ -153,8 +153,8 @@ const app = {
         setTimeout(() => {
             if (type === 'captacao') {
                 container.innerHTML = `
-                    <div class="input-group">
-                        <label>Data da Captação</label>
+                    <div class="input-group date-input-group">
+                        <label>Data</label>
                         <i class="fas fa-calendar-alt"></i>
                         <input type="date" name="data_emprestimo" required>
                     </div>
@@ -184,17 +184,15 @@ const app = {
                         <i class="fas fa-link"></i>
                         <select name="id_captacao_ref" required>${options}</select>
                     </div>
-                    <div class="grid-2-col">
-                        <div class="input-group">
-                            <label>Data do Empréstimo</label>
-                            <i class="fas fa-calendar-check"></i>
-                            <input type="date" name="data_inicio" required>
-                        </div>
-                        <div class="input-group">
-                            <label>Valor Emprestado (R$)</label>
-                            <i class="fas fa-money-bill-wave"></i>
-                            <input type="number" name="valor_emprestado" placeholder="0,00" step="0.01" required>
-                        </div>
+                    <div class="input-group date-input-group">
+                        <label>Data do Empréstimo</label>
+                        <i class="fas fa-calendar-check"></i>
+                        <input type="date" name="data_inicio" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Valor Emprestado (R$)</label>
+                        <i class="fas fa-money-bill-wave"></i>
+                        <input type="number" name="valor_emprestado" placeholder="0,00" step="0.01" required>
                     </div>
                     <input type="hidden" name="status" value="Em Andamento">
                 `;
