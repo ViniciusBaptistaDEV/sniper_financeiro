@@ -13,11 +13,13 @@
     <!-- Overlay de Login -->
     <div id="login-overlay" class="overlay">
         <div class="login-card">
-            <div class="login-icon"><i class="fas fa-crosshairs"></i></div>
-            <h1>SNIPER <span>FINANCEIRO</span></h1>
-            <input type="text" id="login-user" placeholder="Login" onkeydown="if(event.key==='Enter') document.getElementById('login-pass').focus()">
-            <input type="password" id="login-pass" placeholder="Senha" onkeydown="if(event.key==='Enter') app.handleLogin()">
-            <button id="btn-login" class="neon-btn-lg" onclick="app.handleLogin()">Acessar Sistema</button>
+            <form onsubmit="event.preventDefault(); app.handleLogin();">
+                <div class="login-icon"><i class="fas fa-crosshairs"></i></div>
+                <h1>SNIPER <span>FINANCEIRO</span></h1>
+                <input type="text" id="login-user" placeholder="Login" required autocomplete="username">
+                <input type="password" id="login-pass" placeholder="Senha" required autocomplete="current-password">
+                <button type="submit" id="btn-login" class="neon-btn-lg">Acessar Sistema</button>
+            </form>
         </div>
     </div>
 

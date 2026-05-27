@@ -182,17 +182,19 @@ const app = {
                     <div class="input-group">
                         <label>Vincular à Captação</label>
                         <i class="fas fa-link"></i>
-                        <select name="id_captacao_ref">${options}</select>
+                        <select name="id_captacao_ref" required>${options}</select>
                     </div>
-                    <div class="input-group">
-                        <label>Data do Empréstimo</label>
-                        <i class="fas fa-calendar-check"></i>
-                        <input type="date" name="data_inicio" required>
-                    </div>
-                    <div class="input-group">
-                        <label>Valor Emprestado ao Cliente (R$)</label>
-                        <i class="fas fa-money-bill-wave"></i>
-                        <input type="number" name="valor_emprestado" placeholder="0,00" step="0.01" required>
+                    <div class="grid-2-col">
+                        <div class="input-group">
+                            <label>Data do Empréstimo</label>
+                            <i class="fas fa-calendar-check"></i>
+                            <input type="date" name="data_inicio" required>
+                        </div>
+                        <div class="input-group">
+                            <label>Valor Emprestado (R$)</label>
+                            <i class="fas fa-money-bill-wave"></i>
+                            <input type="number" name="valor_emprestado" placeholder="0,00" step="0.01" required>
+                        </div>
                     </div>
                     <input type="hidden" name="status" value="Em Andamento">
                 `;
@@ -208,6 +210,14 @@ const app = {
         const data = Object.fromEntries(formData.entries());
         data.type = document.getElementById('entry-type').value;
 
+        const btn = e.target.querySelector('button[type="submit"]');
+        const originalContent = btn.innerHTML;
+
+        // Estado de carregamento
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+        btn.style.pointerEvents = 'none';
+        btn.style.opacity = '0.7';
+
         const res = await fetch('/api/add-data', {
             method: 'POST',
             headers: { 
@@ -221,7 +231,15 @@ const app = {
             this.showAlert('Os dados foram registrados na planilha com sucesso.', 'REGISTRO SALVO', 'success');
             this.loadData();
             e.target.reset();
+            this.toggleFormFields(); // Reseta os campos dinâmicos para o estado inicial
+        } else {
+            this.showAlert('Erro ao salvar os dados na planilha.', 'ERRO', 'error');
         }
+
+        // Reverter estado do botão
+        btn.innerHTML = originalContent;
+        btn.style.pointerEvents = 'auto';
+        btn.style.opacity = '1';
     },
 
     openEditModal(id) {

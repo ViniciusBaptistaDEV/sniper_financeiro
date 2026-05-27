@@ -22,6 +22,12 @@ body {
     overflow-x: hidden;
 }
 
+/* Torna o ícone do calendário visível em campos de data no tema escuro */
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}
+
 button {
     cursor: pointer;
     font-family: 'Inter', sans-serif;
