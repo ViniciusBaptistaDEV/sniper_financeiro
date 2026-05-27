@@ -1,3 +1,5 @@
 .env
 node_modules
 sniper-financeiro-7ebea70da30f.json
+.vercel
+.env*

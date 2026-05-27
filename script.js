@@ -1,13 +1,44 @@
 const app = {
     state: {
         isLogged: false,
+        isLoggingOut: false,
         data: { captacoes: [], operacoes: [] },
         metaFixa: 50000 // Exemplo de meta de lucro guardado
+    },
+
+    showAlert(message, title = 'NOTIFICAÇÃO', type = 'info') {
+        const modal = document.getElementById('alert-modal');
+        const titleEl = document.getElementById('alert-title');
+        const messageEl = document.getElementById('alert-message');
+        const iconBox = document.getElementById('alert-icon');
+
+        titleEl.innerText = title;
+        messageEl.innerText = message;
+        
+        const icon = type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-info');
+        iconBox.innerHTML = `<i class="fa-solid ${icon}"></i>`;
+        iconBox.style.color = type === 'success' ? 'var(--neon-green)' : (type === 'error' ? '#ff4444' : 'var(--neon-blue)');
+        
+        modal.classList.remove('hidden');
+    },
+
+    closeAlert() {
+        document.getElementById('alert-modal').classList.add('hidden');
+        if (this.state.isLoggingOut) {
+            location.reload();
+        }
     },
 
     async handleLogin() {
         const user = document.getElementById('login-user').value;
         const pass = document.getElementById('login-pass').value;
+        const btn = document.getElementById('btn-login');
+
+        // Estado de carregamento
+        const originalContent = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Entrando...';
+        btn.style.pointerEvents = 'none';
+        btn.style.opacity = '0.8';
 
         const res = await fetch('/api/login', {
             method: 'POST',
@@ -19,7 +50,17 @@ const app = {
             localStorage.setItem('sniper_token', token);
             this.init();
         } else {
-            alert('Acesso Negado');
+            this.showAlert('As credenciais informadas estão incorretas.', 'ACESSO NEGADO', 'error');
+            
+            // Limpar campos e resetar o foco para o usuário
+            document.getElementById('login-user').value = '';
+            document.getElementById('login-pass').value = '';
+            document.getElementById('login-user').focus();
+
+            // Reverter botão em caso de erro
+            btn.innerHTML = originalContent;
+            btn.style.pointerEvents = 'auto';
+            btn.style.opacity = '1';
         }
     },
 
@@ -37,7 +78,13 @@ const app = {
         const res = await fetch('/api/get-data', {
             headers: { 'Authorization': localStorage.getItem('sniper_token') }
         });
-        this.state.data = await res.json();
+        const responseData = await res.json();
+        this.state.data = responseData;
+        
+        if (responseData.config && responseData.config.meta_objetivo) {
+            this.state.metaFixa = parseFloat(responseData.config.meta_objetivo);
+        }
+        
         this.renderDashboard();
         this.renderTable();
     },
@@ -65,7 +112,8 @@ const app = {
         // Barra de Progresso
         const perc = Math.min((lucroGuardado / this.state.metaFixa) * 100, 100);
         document.getElementById('progress-bar').style.width = `${perc}%`;
-        document.getElementById('progress-text').innerText = `${perc.toFixed(1)}% da meta de R$ ${this.state.metaFixa}`;
+        document.getElementById('progress-text').innerText = `${perc.toFixed(1)}% da meta de R$ ${this.state.metaFixa.toLocaleString('pt-BR')}`;
+        document.getElementById('input-meta-objetivo').value = this.state.metaFixa;
     },
 
     renderTable() {
@@ -85,29 +133,68 @@ const app = {
         document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         document.getElementById(`tab-${tabId}`).classList.remove('hidden');
-        event.target.classList.add('active');
+        event.currentTarget.classList.add('active');
     },
 
     toggleFormFields() {
         const type = document.getElementById('entry-type').value;
         const container = document.getElementById('form-fields');
-        
-        if (type === 'captacao') {
-            container.innerHTML = `
-                <input type="date" name="data_emprestimo" required>
-                <input type="number" name="valor_pegado" placeholder="Valor Captado" required>
-                <input type="number" name="valor_parcela" placeholder="Valor da Parcela">
-                <input type="number" name="qtd_parcelas" placeholder="Qtd Parcelas">
-            `;
-        } else {
-            const options = this.state.data.captacoes.map(c => `<option value="${c.id_captacao}">Captação #${c.id_captacao} (R$ ${c.valor_pegado})</option>`);
-            container.innerHTML = `
-                <select name="id_captacao_ref">${options}</select>
-                <input type="date" name="data_inicio" required>
-                <input type="number" name="valor_emprestado" placeholder="Valor Emprestado" required>
-                <input type="hidden" name="status" value="Em Andamento">
-            `;
-        }
+
+        // Pequena animação de transição
+        container.style.opacity = '0';
+        container.style.transform = 'translateY(10px)';
+        container.style.transition = 'all 0.3s ease';
+
+        setTimeout(() => {
+            if (type === 'captacao') {
+                container.innerHTML = `
+                    <div class="input-group">
+                        <label>Data da Captação</label>
+                        <i class="fas fa-calendar-alt"></i>
+                        <input type="date" name="data_emprestimo" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Valor Principal (R$)</label>
+                        <i class="fas fa-hand-holding-usd"></i>
+                        <input type="number" name="valor_pegado" placeholder="0,00" step="0.01" required>
+                    </div>
+                    <div class="grid-2-col">
+                        <div class="input-group">
+                            <label>Valor Parcela (R$)</label>
+                            <i class="fas fa-receipt"></i>
+                            <input type="number" name="valor_parcela" placeholder="0,00" step="0.01">
+                        </div>
+                        <div class="input-group">
+                            <label>Qtd. Parcelas</label>
+                            <i class="fas fa-list-ol"></i>
+                            <input type="number" name="qtd_parcelas" placeholder="12">
+                        </div>
+                    </div>
+                `;
+            } else {
+                const options = this.state.data.captacoes.map(c => `<option value="${c.id_captacao}">Captação #${c.id_captacao} (R$ ${c.valor_pegado})</option>`);
+                container.innerHTML = `
+                    <div class="input-group">
+                        <label>Vincular à Captação</label>
+                        <i class="fas fa-link"></i>
+                        <select name="id_captacao_ref">${options}</select>
+                    </div>
+                    <div class="input-group">
+                        <label>Data do Empréstimo</label>
+                        <i class="fas fa-calendar-check"></i>
+                        <input type="date" name="data_inicio" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Valor Emprestado ao Cliente (R$)</label>
+                        <i class="fas fa-money-bill-wave"></i>
+                        <input type="number" name="valor_emprestado" placeholder="0,00" step="0.01" required>
+                    </div>
+                    <input type="hidden" name="status" value="Em Andamento">
+                `;
+            }
+            container.style.opacity = '1';
+            container.style.transform = 'translateY(0)';
+        }, 50);
     },
 
     async handleSubmit(e) {
@@ -126,7 +213,7 @@ const app = {
         });
 
         if (res.ok) {
-            alert('Salvo com sucesso!');
+            this.showAlert('Os dados foram registrados na planilha com sucesso.', 'REGISTRO SALVO', 'success');
             this.loadData();
             e.target.reset();
         }
@@ -168,13 +255,56 @@ const app = {
 
         if (res.ok) {
             this.closeModal();
+            this.showAlert('A operação foi atualizada com os novos valores de rateio.', 'SUCESSO', 'success');
             this.loadData();
         }
     },
 
     closeModal() { document.getElementById('edit-modal').classList.add('hidden'); },
 
-    logout() { localStorage.removeItem('sniper_token'); location.reload(); }
+    openInfoModal() { document.getElementById('info-modal').classList.remove('hidden'); },
+    closeInfoModal() { document.getElementById('info-modal').classList.add('hidden'); },
+
+    async updateMeta() {
+        const novaMeta = document.getElementById('input-meta-objetivo').value;
+        if (!novaMeta || novaMeta <= 0) return this.showAlert('Insira um valor válido para a meta.', 'ERRO', 'error');
+
+        const btn = document.getElementById('btn-save-meta');
+        const originalContent = btn.innerHTML;
+
+        // Estado de carregamento
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+        btn.style.pointerEvents = 'none';
+        btn.style.opacity = '0.7';
+
+        const res = await fetch('/api/update-config', {
+            method: 'POST',
+            headers: { 
+                'Authorization': localStorage.getItem('sniper_token'),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ meta: novaMeta })
+        });
+
+        if (res.ok) {
+            this.state.metaFixa = parseFloat(novaMeta);
+            this.renderDashboard();
+            this.showAlert('A meta do objetivo foi atualizada com sucesso.', 'CONFIGURAÇÃO SALVA', 'success');
+        } else {
+            this.showAlert('Erro ao salvar a nova meta na planilha.', 'ERRO', 'error');
+        }
+
+        // Reverter estado do botão
+        btn.innerHTML = originalContent;
+        btn.style.pointerEvents = 'auto';
+        btn.style.opacity = '1';
+    },
+
+    logout() {
+        localStorage.removeItem('sniper_token');
+        this.state.isLoggingOut = true;
+        this.showAlert('Sua sessão foi encerrada com segurança.', 'SAÍDA COM SUCESSO', 'success');
+    }
 };
 
 // Iniciar se já houver token
