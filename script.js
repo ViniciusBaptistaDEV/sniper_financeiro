@@ -11,6 +11,28 @@ const app = {
         return parseFloat(val || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     },
 
+    // Impede a digitação de letras e caracteres especiais (apenas números, ponto e vírgula)
+    handleInputCurrency(el) {
+        el.value = el.value.replace(/[^0-9.,]/g, '');
+    },
+
+    // Converte string formatada (7.500,00) de volta para número (7500.00)
+    parseCurrency(val) {
+        if (typeof val === 'number') return val;
+        return parseFloat(val.replace(/\./g, '').replace(',', '.')) || 0;
+    },
+
+    handleBlurCurrency(el) {
+        if (!el.value) return;
+        const numericValue = this.parseCurrency(el.value);
+        el.value = this.formatCurrency(numericValue);
+    },
+
+    handleFocusCurrency(el) {
+        if (!el.value) return;
+        el.value = this.parseCurrency(el.value).toString().replace('.', ',');
+    },
+
     showAlert(message, title = 'NOTIFICAÇÃO', type = 'info') {
         const modal = document.getElementById('alert-modal');
         const titleEl = document.getElementById('alert-title');
@@ -52,7 +74,7 @@ const app = {
 
         if (res.ok) {
             const { token } = await res.json();
-            localStorage.setItem('sniper_token', token);
+            sessionStorage.setItem('sniper_token', token);
             this.init();
         } else {
             this.showAlert('As credenciais informadas estão incorretas.', 'ACESSO NEGADO', 'error');
@@ -70,7 +92,7 @@ const app = {
     },
 
     async init() {
-        const token = localStorage.getItem('sniper_token');
+        const token = sessionStorage.getItem('sniper_token');
         if (!token) return;
 
         document.getElementById('login-overlay').classList.add('hidden');
@@ -81,7 +103,7 @@ const app = {
 
     async loadData() {
         const res = await fetch('/api/get-data', {
-            headers: { 'Authorization': localStorage.getItem('sniper_token') }
+            headers: { 'Authorization': sessionStorage.getItem('sniper_token') }
         });
         const responseData = await res.json();
         this.state.data = responseData;
@@ -118,7 +140,7 @@ const app = {
         const perc = Math.min((lucroGuardado / this.state.metaFixa) * 100, 100);
         document.getElementById('progress-bar').style.width = `${perc}%`;
         document.getElementById('progress-text').innerText = `${perc.toFixed(2)}% da meta de R$ ${this.formatCurrency(this.state.metaFixa)}`;
-        document.getElementById('input-meta-objetivo').value = this.state.metaFixa;
+        document.getElementById('input-meta-objetivo').value = this.formatCurrency(this.state.metaFixa);
     },
 
     renderTable() {
@@ -161,13 +183,13 @@ const app = {
                     <div class="input-group">
                         <label>Valor Principal (R$)</label>
                         <i class="fas fa-hand-holding-usd"></i>
-                        <input type="number" name="valor_pegado" placeholder="0,00" step="0.01" required>
+                        <input type="text" name="valor_pegado" placeholder="0,00" required oninput="app.handleInputCurrency(this)" onfocus="app.handleFocusCurrency(this)" onblur="app.handleBlurCurrency(this)">
                     </div>
                     <div class="grid-2-col">
                         <div class="input-group">
                             <label>Valor Parcela (R$)</label>
                             <i class="fas fa-receipt"></i>
-                            <input type="number" name="valor_parcela" placeholder="0,00" step="0.01">
+                            <input type="text" name="valor_parcela" placeholder="0,00" oninput="app.handleInputCurrency(this)" onfocus="app.handleFocusCurrency(this)" onblur="app.handleBlurCurrency(this)">
                         </div>
                         <div class="input-group">
                             <label>Qtd. Parcelas</label>
@@ -192,7 +214,7 @@ const app = {
                     <div class="input-group">
                         <label>Valor Emprestado (R$)</label>
                         <i class="fas fa-money-bill-wave"></i>
-                        <input type="number" name="valor_emprestado" placeholder="0,00" step="0.01" required>
+                        <input type="text" name="valor_emprestado" placeholder="0,00" required oninput="app.handleInputCurrency(this)" onfocus="app.handleFocusCurrency(this)" onblur="app.handleBlurCurrency(this)">
                     </div>
                     <input type="hidden" name="status" value="Em Andamento">
                 `;
@@ -205,7 +227,13 @@ const app = {
     async handleSubmit(e) {
         e.preventDefault();
         const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
+        let data = Object.fromEntries(formData.entries());
+        
+        // Limpar campos monetários antes de enviar
+        if (data.valor_pegado) data.valor_pegado = this.parseCurrency(data.valor_pegado);
+        if (data.valor_parcela) data.valor_parcela = this.parseCurrency(data.valor_parcela);
+        if (data.valor_emprestado) data.valor_emprestado = this.parseCurrency(data.valor_emprestado);
+        
         data.type = document.getElementById('entry-type').value;
 
         const btn = e.target.querySelector('button[type="submit"]');
@@ -219,7 +247,7 @@ const app = {
         const res = await fetch('/api/add-data', {
             method: 'POST',
             headers: { 
-                'Authorization': localStorage.getItem('sniper_token'),
+                'Authorization': sessionStorage.getItem('sniper_token'),
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(data)
@@ -243,7 +271,7 @@ const app = {
     openEditModal(id) {
         const op = this.state.data.operacoes.find(o => o.id_operacao == id);
         document.getElementById('edit-id').value = id;
-        document.getElementById('edit-lucro-bruto').value = op.lucro_bruto_recebido;
+        document.getElementById('edit-lucro-bruto').value = this.formatCurrency(op.lucro_bruto_recebido);
         document.getElementById('edit-status').value = op.status;
         document.getElementById('edit-modal').classList.remove('hidden');
     },
@@ -251,7 +279,7 @@ const app = {
     async handleUpdate(e) {
         e.preventDefault();
         const id = document.getElementById('edit-id').value;
-        const lucroBruto = parseFloat(document.getElementById('edit-lucro-bruto').value);
+        const lucroBruto = this.parseCurrency(document.getElementById('edit-lucro-bruto').value);
         
         // Lógica de Rateio (1/3 para cada)
         const rateio = lucroBruto / 3;
@@ -268,7 +296,7 @@ const app = {
         const res = await fetch('/api/update-data', {
             method: 'PUT',
             headers: { 
-                'Authorization': localStorage.getItem('sniper_token'),
+                'Authorization': sessionStorage.getItem('sniper_token'),
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
@@ -286,14 +314,14 @@ const app = {
     openInfoModal() { 
         // Sincroniza o valor do input com a meta salva no estado antes de abrir
         const input = document.getElementById('input-meta-objetivo');
-        input.value = this.state.metaFixa;
+        input.value = this.formatCurrency(this.state.metaFixa);
         document.getElementById('info-modal').classList.remove('hidden'); 
     },
 
     closeInfoModal() { 
         document.getElementById('info-modal').classList.add('hidden');
         // Reseta o valor caso o usuário tenha alterado mas não salvado
-        document.getElementById('input-meta-objetivo').value = this.state.metaFixa;
+        document.getElementById('input-meta-objetivo').value = this.formatCurrency(this.state.metaFixa);
         this.toggleEditMeta(false); // Garante que o campo volte a ser apenas leitura ao fechar
     },
 
@@ -315,7 +343,7 @@ const app = {
     },
 
     async updateMeta() {
-        const novaMeta = document.getElementById('input-meta-objetivo').value;
+        const novaMeta = this.parseCurrency(document.getElementById('input-meta-objetivo').value);
         if (!novaMeta || novaMeta <= 0) return this.showAlert('Insira um valor válido para a meta.', 'ERRO', 'error');
 
         const btn = document.getElementById('btn-save-meta');
@@ -329,7 +357,7 @@ const app = {
         const res = await fetch('/api/update-config', {
             method: 'POST',
             headers: { 
-                'Authorization': localStorage.getItem('sniper_token'),
+                'Authorization': sessionStorage.getItem('sniper_token'),
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ meta: novaMeta })
@@ -351,11 +379,11 @@ const app = {
     },
 
     logout() {
-        localStorage.removeItem('sniper_token');
+        sessionStorage.removeItem('sniper_token');
         this.state.isLoggingOut = true;
         this.showAlert('Sua sessão foi encerrada com segurança.', 'SAÍDA COM SUCESSO', 'success');
     }
 };
 
 // Iniciar se já houver token
-if (localStorage.getItem('sniper_token')) app.init();
+if (sessionStorage.getItem('sniper_token')) app.init();

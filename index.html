@@ -121,7 +121,7 @@
             <form id="edit-form" onsubmit="app.handleUpdate(event)">
                 <input type="hidden" id="edit-id">
                 <label>Lucro Bruto Recebido:</label>
-                <input type="number" id="edit-lucro-bruto" step="0.01">
+                <input type="text" id="edit-lucro-bruto" oninput="app.handleInputCurrency(this)" onfocus="app.handleFocusCurrency(this)" onblur="app.handleBlurCurrency(this)">
                 
                 <label>Status:</label>
                 <select id="edit-status">
@@ -157,7 +157,7 @@
                 <h4>CONFIGURAR NOVA META</h4>
                 <div class="input-group">
                     <i class="fas fa-edit"></i>
-                    <input type="number" id="input-meta-objetivo" placeholder="Valor da Meta (Ex: 100000)" readonly>
+                    <input type="text" id="input-meta-objetivo" placeholder="Valor da Meta (Ex: 100.000,00)" readonly oninput="app.handleInputCurrency(this)" onfocus="app.handleFocusCurrency(this)" onblur="app.handleBlurCurrency(this)">
                 </div>
                 <button id="btn-edit-meta" onclick="app.toggleEditMeta(true)" class="neon-btn" style="width: 100%; margin-bottom: 10px;">Editar Meta</button>
                 <button id="btn-save-meta" onclick="app.updateMeta()" class="neon-btn hidden" style="width: 100%; margin-bottom: 10px;">Salvar Alteração</button>
