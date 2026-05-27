@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sniper Financeiro | Arbitragem</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Overlay de Login -->
+    <div id="login-overlay" class="overlay">
+        <div class="login-card">
+            <h1>SNIPER <span>FINANCEIRO</span></h1>
+            <input type="text" id="login-user" placeholder="Login">
+            <input type="password" id="login-pass" placeholder="Senha">
+            <button onclick="app.handleLogin()">Acessar Sistema</button>
+        </div>
+    </div>
+
+    <!-- Main App Content -->
+    <div id="app-content" class="hidden">
+        <nav class="sidebar">
+            <div class="logo">SNIPER</div>
+            <button class="nav-btn active" onclick="app.switchTab('dashboard')">Dashboard</button>
+            <button class="nav-btn" onclick="app.switchTab('view')">Operações</button>
+            <button class="nav-btn" onclick="app.switchTab('add')">Novo Registro</button>
+            <button class="logout-btn" onclick="app.logout()">Sair</button>
+        </nav>
+
+        <main class="content">
+            <!-- ABA 1: DASHBOARD -->
+            <section id="tab-dashboard" class="tab-content">
+                <div class="kpi-grid">
+                    <div class="kpi-card neon-green">
+                        <span>Lucro Líquido Guardado</span>
+                        <h2 id="kpi-lucro-guardado">R$ 0,00</h2>
+                    </div>
+                    <div class="kpi-card neon-blue">
+                        <span>Capital Ativo na Rua</span>
+                        <h2 id="kpi-capital-ativo">R$ 0,00</h2>
+                    </div>
+                    <div class="kpi-card neon-yellow">
+                        <span>ROI Médio</span>
+                        <h2 id="kpi-roi">0%</h2>
+                    </div>
+                    <div class="kpi-card neon-orange">
+                        <span>Parcelas Pagas (Banco)</span>
+                        <h2 id="kpi-parcelas">0/0</h2>
+                    </div>
+                </div>
+                
+                <div class="progress-section">
+                    <h3>Progresso do Objetivo</h3>
+                    <div class="progress-container">
+                        <div id="progress-bar" class="progress-bar"></div>
+                    </div>
+                    <span id="progress-text">0% atingido</span>
+                </div>
+            </section>
+
+            <!-- ABA 2: VISUALIZAR/EDITAR -->
+            <section id="tab-view" class="tab-content hidden">
+                <div class="table-container">
+                    <table id="ops-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Valor</th>
+                                <th>Lucro Bruto</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- ABA 3: INCLUIR -->
+            <section id="tab-add" class="tab-content hidden">
+                <div class="form-card">
+                    <select id="entry-type" onchange="app.toggleFormFields()">
+                        <option value="captacao">Nova Captação (Banco)</option>
+                        <option value="operacao">Nova Operação (Cliente)</option>
+                    </select>
+                    
+                    <form id="main-form" onsubmit="app.handleSubmit(event)">
+                        <div id="form-fields">
+                            <!-- Dinâmico via JS -->
+                        </div>
+                        <button type="submit" class="neon-btn">Salvar Registro</button>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal de Edição -->
+    <div id="edit-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Atualizar Operação</h3>
+            <form id="edit-form" onsubmit="app.handleUpdate(event)">
+                <input type="hidden" id="edit-id">
+                <label>Lucro Bruto Recebido:</label>
+                <input type="number" id="edit-lucro-bruto" step="0.01">
+                
+                <label>Status:</label>
+                <select id="edit-status">
+                    <option value="Em Andamento">Em Andamento</option>
+                    <option value="Finalizada">Finalizada</option>
+                </select>
+
+                <div class="modal-actions">
+                    <button type="button" onclick="app.closeModal()">Cancelar</button>
+                    <button type="submit" class="save-btn">Atualizar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
