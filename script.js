@@ -6,6 +6,11 @@ const app = {
         metaFixa: 50000 // Exemplo de meta de lucro guardado
     },
 
+    // Helper para formatar valores monetários com 2 casas decimais
+    formatCurrency(val) {
+        return parseFloat(val || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    },
+
     showAlert(message, title = 'NOTIFICAÇÃO', type = 'info') {
         const modal = document.getElementById('alert-modal');
         const titleEl = document.getElementById('alert-title');
@@ -105,14 +110,14 @@ const app = {
             : 0;
 
         // Atualizar UI
-        document.getElementById('kpi-lucro-guardado').innerText = `R$ ${lucroGuardado.toLocaleString('pt-BR')}`;
-        document.getElementById('kpi-capital-ativo').innerText = `R$ ${capitalAtivo.toLocaleString('pt-BR')}`;
+        document.getElementById('kpi-lucro-guardado').innerText = `R$ ${this.formatCurrency(lucroGuardado)}`;
+        document.getElementById('kpi-capital-ativo').innerText = `R$ ${this.formatCurrency(capitalAtivo)}`;
         document.getElementById('kpi-roi').innerText = `${roiMedio.toFixed(2)}%`;
         
         // Barra de Progresso
         const perc = Math.min((lucroGuardado / this.state.metaFixa) * 100, 100);
         document.getElementById('progress-bar').style.width = `${perc}%`;
-        document.getElementById('progress-text').innerText = `${perc.toFixed(1)}% da meta de R$ ${this.state.metaFixa.toLocaleString('pt-BR')}`;
+        document.getElementById('progress-text').innerText = `${perc.toFixed(2)}% da meta de R$ ${this.formatCurrency(this.state.metaFixa)}`;
         document.getElementById('input-meta-objetivo').value = this.state.metaFixa;
     },
 
@@ -121,8 +126,8 @@ const app = {
         tbody.innerHTML = this.state.data.operacoes.map(op => `
             <tr>
                 <td>${op.data_inicio}</td>
-                <td>R$ ${op.valor_emprestado}</td>
-                <td>R$ ${op.lucro_bruto_recebido || 0}</td>
+                <td>R$ ${this.formatCurrency(op.valor_emprestado)}</td>
+                <td>R$ ${this.formatCurrency(op.lucro_bruto_recebido)}</td>
                 <td><span class="badge ${op.status === 'Finalizada' ? 'green' : 'blue'}">${op.status}</span></td>
                 <td><button onclick="app.openEditModal('${op.id_operacao}')">Editar</button></td>
             </tr>
@@ -172,7 +177,7 @@ const app = {
                     </div>
                 `;
             } else {
-                const options = this.state.data.captacoes.map(c => `<option value="${c.id_captacao}">Captação #${c.id_captacao} (R$ ${c.valor_pegado})</option>`);
+                const options = this.state.data.captacoes.map(c => `<option value="${c.id_captacao}">Captação #${c.id_captacao} (R$ ${this.formatCurrency(c.valor_pegado)})</option>`);
                 container.innerHTML = `
                     <div class="input-group">
                         <label>Vincular à Captação</label>
@@ -262,8 +267,36 @@ const app = {
 
     closeModal() { document.getElementById('edit-modal').classList.add('hidden'); },
 
-    openInfoModal() { document.getElementById('info-modal').classList.remove('hidden'); },
-    closeInfoModal() { document.getElementById('info-modal').classList.add('hidden'); },
+    openInfoModal() { 
+        // Sincroniza o valor do input com a meta salva no estado antes de abrir
+        const input = document.getElementById('input-meta-objetivo');
+        input.value = this.state.metaFixa;
+        document.getElementById('info-modal').classList.remove('hidden'); 
+    },
+
+    closeInfoModal() { 
+        document.getElementById('info-modal').classList.add('hidden');
+        // Reseta o valor caso o usuário tenha alterado mas não salvado
+        document.getElementById('input-meta-objetivo').value = this.state.metaFixa;
+        this.toggleEditMeta(false); // Garante que o campo volte a ser apenas leitura ao fechar
+    },
+
+    toggleEditMeta(active) {
+        const input = document.getElementById('input-meta-objetivo');
+        const btnEdit = document.getElementById('btn-edit-meta');
+        const btnSave = document.getElementById('btn-save-meta');
+        
+        input.readOnly = !active;
+        
+        if (active) {
+            btnEdit.classList.add('hidden');
+            btnSave.classList.remove('hidden');
+            input.focus();
+        } else {
+            btnEdit.classList.remove('hidden');
+            btnSave.classList.add('hidden');
+        }
+    },
 
     async updateMeta() {
         const novaMeta = document.getElementById('input-meta-objetivo').value;
@@ -290,6 +323,7 @@ const app = {
             this.state.metaFixa = parseFloat(novaMeta);
             this.renderDashboard();
             this.showAlert('A meta do objetivo foi atualizada com sucesso.', 'CONFIGURAÇÃO SALVA', 'success');
+            this.toggleEditMeta(false);
         } else {
             this.showAlert('Erro ao salvar a nova meta na planilha.', 'ERRO', 'error');
         }

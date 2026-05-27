@@ -155,11 +155,12 @@
                 <h4>CONFIGURAR NOVA META</h4>
                 <div class="input-group">
                     <i class="fas fa-edit"></i>
-                    <input type="number" id="input-meta-objetivo" placeholder="Valor da Meta (Ex: 100000)">
+                    <input type="number" id="input-meta-objetivo" placeholder="Valor da Meta (Ex: 100000)" readonly>
                 </div>
-                <button id="btn-save-meta" onclick="app.updateMeta()" class="neon-btn" style="width: 100%; margin-bottom: 10px;">Salvar Alteração</button>
+                <button id="btn-edit-meta" onclick="app.toggleEditMeta(true)" class="neon-btn" style="width: 100%; margin-bottom: 10px;">Editar Meta</button>
+                <button id="btn-save-meta" onclick="app.updateMeta()" class="neon-btn hidden" style="width: 100%; margin-bottom: 10px;">Salvar Alteração</button>
             </div>
-            <button onclick="app.closeInfoModal()" class="neon-btn" style="width: 100%; border-color: #444; color: #888;">Fechar</button>
+            <button onclick="app.closeInfoModal()" class="neon-btn" style="width: 100%; border-color: #444; color: #888;">Voltar</button>
         </div>
     </div>
 

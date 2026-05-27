@@ -272,7 +272,19 @@ button:active {
 
 .info-settings .input-group i {
     color: var(--neon-blue);
-    bottom: 12px; /* Ajuste fino para alinhar dentro do campo */
+    bottom: auto !important;
+    top: 50%;
+    transform: translateY(-50%);
+    line-height: 0;
+}
+
+.info-settings .input-group {
+    margin-bottom: 15px;
+}
+
+/* Remove margens que deslocam o ícone dentro do modal */
+.info-settings .input-group input {
+    margin: 0 !important;
 }
 
 /* Tables */
