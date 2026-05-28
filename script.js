@@ -231,6 +231,10 @@ const app = {
             return `
             <tr>
                 <td data-label="Início">${op.data_inicio ? new Date(op.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                <td data-label="Destino">
+                    ${op.beneficiario_ou_item || '-'}
+                    ${op.observacao ? `<i class="fas fa-comment-dots info-trigger" style="margin-left: 5px; color: var(--neon-blue);" onclick="app.showAlert('${op.observacao}', 'OBSERVAÇÃO DA AQUISIÇÃO')"></i>` : ''}
+                </td>
                 <td data-label="Fim">${op.status === 'Finalizada' ? (op.data_fim ? new Date(op.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '-') : '<span style="font-size: 0.75rem; opacity: 0.7; font-style: italic;">Aguardando finalização...</span>'}</td>
                 <td data-label="Valor">R$ ${this.formatCurrency(op.valor_emprestado)}</td>
                 <td data-label="Lucro Bruto">R$ ${this.formatCurrency(op.lucro_bruto_recebido)}</td>
@@ -297,6 +301,19 @@ const app = {
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         document.getElementById(`tab-${tabId}`).classList.remove('hidden');
         if (event) event.currentTarget.classList.add('active');
+
+        // Reinicia o formulário de Novo Registro e sincroniza dados para garantir saldos precisos
+        if (tabId === 'add') {
+            const entryType = document.getElementById('entry-type');
+            if (entryType) entryType.value = "";
+
+            const mainForm = document.getElementById('main-form');
+            if (mainForm) mainForm.reset();
+
+            this.toggleFormFields();
+            this.loadData(); // Sincroniza com o servidor no exato momento da abertura
+        }
+
         if (tabId === 'captacoes') this.renderCaptacoes();
         if (tabId === 'earnings') this.renderEarnings();
     },
@@ -334,6 +351,64 @@ const app = {
         });
     },
 
+    getAvailableBalance(idCaptacao) {
+        const cap = this.state.data.captacoes.find(c => c.id_captacao == idCaptacao);
+        if (!cap) return 0;
+
+        const total = parseFloat(cap.valor_pegado) || 0;
+        // Consideramos apenas operações "Em Andamento" como capital que está "na rua" consumindo a captação
+        const used = this.state.data.operacoes
+            .filter(o => o.id_captacao_ref == idCaptacao && o.status === 'Em Andamento')
+            .reduce((acc, o) => acc + (parseFloat(o.valor_emprestado) || 0), 0);
+
+        return total - used;
+    },
+
+    updateBalanceHint(id) {
+        const el = document.getElementById('balance-hint');
+        if (!el) return;
+        if (!id) {
+            el.innerText = '';
+            return;
+        }
+        const bal = this.getAvailableBalance(id);
+        if (el) {
+            el.innerText = `Saldo disponível nesta captação: R$ ${this.formatCurrency(bal)}`;
+            el.style.color = bal <= 0 ? '#ff4444' : 'var(--neon-blue)';
+        }
+    },
+
+    handleTipoAplicacaoChange(val) {
+        const container = document.getElementById('op-dynamic-fields');
+        if (!container) return;
+        
+        if (val === 'emprestimo') {
+            container.innerHTML = `
+                <div class="input-group">
+                    <label>Nome de quem emprestou</label>
+                    <i class="fas fa-user"></i>
+                    <input type="text" name="beneficiario_ou_item" placeholder="Ex: João Silva" required>
+                </div>
+                <div class="input-group">
+                    <label>Observações</label>
+                    <i class="fas fa-comment-alt"></i>
+                    <input type="text" name="observacao" placeholder="Detalhes adicionais do empréstimo...">
+                </div>`;
+        } else {
+            container.innerHTML = `
+                <div class="input-group">
+                    <label>O que foi adquirido?</label>
+                    <i class="fas fa-shopping-cart"></i>
+                    <input type="text" name="beneficiario_ou_item" placeholder="Ex: Veículo/Casa/Apartamento" required>
+                </div>
+                <div class="input-group">
+                    <label>Observações</label>
+                    <i class="fas fa-comment-alt"></i>
+                    <input type="text" name="observacao" placeholder="Detalhes adicionais da aquisição...">
+                </div>`;
+        }
+    },
+
     toggleFormFields() {
         const type = document.getElementById('entry-type').value;
         const container = document.getElementById('form-fields');
@@ -344,12 +419,15 @@ const app = {
         container.style.transition = 'all 0.3s ease';
 
         setTimeout(() => {
-            if (type === 'captacao') {
+            if (!type) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-gray); font-size: 0.9rem; margin-top: 2rem; opacity: 0.6;">Selecione um tipo de registro para exibir o formulário.</p>';
+            } else if (type === 'captacao') {
                 container.innerHTML = `
                     <div class="input-group">
                         <label>Origem do Recurso</label>
                         <i class="fas fa-landmark"></i>
-                        <select name="origem" onchange="app.handleCaptacaoOriginChange(this.value)">
+                        <select name="origem" onchange="app.handleCaptacaoOriginChange(this.value)" required>
+                            <option value="" disabled selected>Selecione a origem...</option>
                             <option value="banco">Empréstimo de Banco</option>
                             <option value="proprio">Dinheiro Próprio</option>
                         </select>
@@ -395,23 +473,37 @@ const app = {
                     <input type="hidden" name="quitamento_parcelas" value="false">
                 `;
             } else {
-                const options = this.state.data.captacoes.map(c => `<option value="${c.id_captacao}">Captação #${c.id_captacao} (R$ ${this.formatCurrency(c.valor_pegado)})</option>`);
+                const options = this.state.data.captacoes.map(c => `<option value="${c.id_captacao}">Captação #${c.id_captacao} (R$ ${this.formatCurrency(c.valor_pegado)})</option>`).join('');
                 container.innerHTML = `
-                    <div class="input-group">
+                    <div class="input-group" style="margin-bottom: 5px;">
                         <label>Vincular à Captação</label>
                         <i class="fas fa-link"></i>
-                        <select name="id_captacao_ref" required>${options}</select>
+                        <select name="id_captacao_ref" required onchange="app.updateBalanceHint(this.value)">
+                            <option value="" disabled selected>Selecione a captação...</option>
+                            ${options}
+                        </select>
                     </div>
+                    <small id="balance-hint" style="display: block; margin-bottom: 1.5rem; font-size: 0.75rem; font-weight: 600;"></small>
                     <div class="input-group date-input-group">
                         <label>Data do Empréstimo</label>
                         <i class="fas fa-calendar-check"></i>
                         <input type="date" name="data_inicio" required>
                     </div>
                     <div class="input-group">
-                        <label>Valor Emprestado (R$)</label>
+                        <label>Valor Investido (R$)</label>
                         <i class="fas fa-money-bill-wave"></i>
                         <input type="text" name="valor_emprestado" placeholder="0,00" required oninput="app.handleInputCurrency(this)" onfocus="app.handleFocusCurrency(this)" onblur="app.handleBlurCurrency(this)">
                     </div>
+                    <div class="input-group">
+                        <label>Tipo de Aplicação</label>
+                        <i class="fas fa-tags"></i>
+                        <select name="tipo_aplicacao" onchange="app.handleTipoAplicacaoChange(this.value)" required>
+                            <option value="" disabled selected>Selecione o tipo...</option>
+                            <option value="emprestimo">Empréstimo (Dinheiro)</option>
+                            <option value="aquisicao">Aquisição (Bem/Produto)</option>
+                        </select>
+                    </div>
+                    <div id="op-dynamic-fields"></div>
                     <input type="hidden" name="status" value="Em Andamento">
                 `;
             }
@@ -430,6 +522,14 @@ const app = {
         if (data.valor_parcela) data.valor_parcela = this.parseCurrency(data.valor_parcela);
         if (data.total_com_juros) data.total_com_juros = this.parseCurrency(data.total_com_juros);
         if (data.valor_emprestado) data.valor_emprestado = this.parseCurrency(data.valor_emprestado);
+
+        // Validação de saldo no Frontend
+        if (document.getElementById('entry-type').value === 'operacao') {
+            const balance = this.getAvailableBalance(data.id_captacao_ref);
+            if (data.valor_emprestado > balance) {
+                return this.showAlert(`Saldo insuficiente! Esta captação possui apenas R$ ${this.formatCurrency(balance)} disponíveis.`, 'LIMITE EXCEDIDO', 'error');
+            }
+        }
 
         data.type = document.getElementById('entry-type').value;
 
@@ -467,7 +567,13 @@ const app = {
 
     openEditModal(id) {
         const op = this.state.data.operacoes.find(o => o.id_operacao == id);
+        if (!op) return;
+
         document.getElementById('edit-id').value = id;
+        
+        // Renderiza os campos de beneficiário/item e observação conforme o tipo salvo
+        this.renderEditDynamicFields(op.tipo_aplicacao || 'emprestimo', op);
+
         document.getElementById('edit-lucro-bruto').value = this.formatCurrency(0);
         document.getElementById('edit-data-fim').value = op.data_fim || '';
         document.getElementById('edit-lucro-guardado').value = this.formatCurrency(0);
@@ -479,6 +585,37 @@ const app = {
 
         this.toggleEditProfitFields();
         document.getElementById('edit-modal').classList.remove('hidden');
+    },
+
+    renderEditDynamicFields(type, op) {
+        const container = document.getElementById('edit-op-dynamic-fields');
+        if (!container) return;
+        
+        if (type === 'emprestimo') {
+            container.innerHTML = `
+                <div class="input-group">
+                    <label>Nome de quem emprestou</label>
+                    <i class="fas fa-user"></i>
+                    <input type="text" id="edit-beneficiario" value="${op.beneficiario_ou_item || ''}" required>
+                </div>
+                <div class="input-group">
+                    <label>Observações</label>
+                    <i class="fas fa-comment-alt"></i>
+                    <input type="text" id="edit-observacao" value="${op.observacao || ''}" placeholder="Detalhes adicionais...">
+                </div>`;
+        } else {
+            container.innerHTML = `
+                <div class="input-group">
+                    <label>O que foi adquirido?</label>
+                    <i class="fas fa-shopping-cart"></i>
+                    <input type="text" id="edit-beneficiario" value="${op.beneficiario_ou_item || ''}" required>
+                </div>
+                <div class="input-group">
+                    <label>Observações</label>
+                    <i class="fas fa-comment-alt"></i>
+                    <input type="text" id="edit-observacao" value="${op.observacao || ''}" placeholder="Detalhes adicionais da aquisição...">
+                </div>`;
+        }
     },
 
     toggleEditProfitFields() {
@@ -511,6 +648,10 @@ const app = {
         const status = document.getElementById('edit-status').value;
         const dataFim = document.getElementById('edit-data-fim').value;
 
+        // Captura os novos campos dinâmicos
+        const beneficiario = document.getElementById('edit-beneficiario') ? document.getElementById('edit-beneficiario').value : '';
+        const observacao = document.getElementById('edit-observacao') ? document.getElementById('edit-observacao').value : '';
+
         const lucroBruto = this.parseCurrency(document.getElementById('edit-lucro-bruto').value);
         const lucroReserva = this.parseCurrency(document.getElementById('edit-lucro-guardado').value);
         const lucroBanco = this.parseCurrency(document.getElementById('edit-lucro-parcela').value);
@@ -530,6 +671,8 @@ const app = {
 
         const payload = {
             id_operacao: id,
+            beneficiario_ou_item: beneficiario,
+            observacao: observacao,
             lucro_bruto_recebido: lucroBruto,
             lucro_guardado: lucroReserva.toFixed(2),
             lucro_usado_parcela: lucroBanco.toFixed(2),

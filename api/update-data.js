@@ -45,6 +45,9 @@ module.exports = async function handler(req, res) {
         row.set('lucro_usado_parcela', body.lucro_usado_parcela);
         row.set('lucro_gastos_pessoais', body.lucro_gastos_pessoais);
         row.set('status', body.status);
+        if (body.beneficiario_ou_item) row.set('beneficiario_ou_item', body.beneficiario_ou_item);
+        if (body.tipo_aplicacao) row.set('tipo_aplicacao', body.tipo_aplicacao);
+        if (body.observacao !== undefined) row.set('observacao', body.observacao);
         row.set('data_fim', body.data_fim);
 
         await row.save();

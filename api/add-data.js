@@ -26,11 +26,30 @@ module.exports = async function handler(req, res) {
                 quitamento_parcelas: body.quitamento_parcelas || 'false'
             });
         } else if (body.type === 'operacao') {
+            // Validação de Saldo Disponível
+            const sheetCaps = doc.sheetsByTitle['Captacoes'];
+            const sheetOps = doc.sheetsByTitle['Operacoes'];
+            const capsRows = await sheetCaps.getRows();
+            const opsRows = await sheetOps.getRows();
+
+            const cap = capsRows.find(r => r.get('id_captacao') === body.id_captacao_ref);
+            const totalCap = parseFloat(cap.get('valor_pegado')) || 0;
+            const used = opsRows
+                .filter(r => r.get('id_captacao_ref') === body.id_captacao_ref && r.get('status') === 'Em Andamento')
+                .reduce((acc, r) => acc + (parseFloat(r.get('valor_emprestado')) || 0), 0);
+
+            if (parseFloat(body.valor_emprestado) > (totalCap - used)) {
+                return res.status(400).json({ error: 'Saldo insuficiente nesta captação para realizar a operação.' });
+            }
+
             const sheet = doc.sheetsByTitle['Operacoes'];
             await sheet.addRow({
                 id_operacao: Date.now().toString(),
                 id_captacao_ref: body.id_captacao_ref,
                 data_inicio: body.data_inicio,
+                tipo_aplicacao: body.tipo_aplicacao,
+                beneficiario_ou_item: body.beneficiario_ou_item,
+                observacao: body.observacao || '',
                 valor_emprestado: body.valor_emprestado,
                 status: body.status || 'Em Andamento',
                 lucro_bruto_recebido: 0,
