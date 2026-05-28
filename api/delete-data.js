@@ -10,11 +10,15 @@ module.exports = async function handler(req, res) {
 
         const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
         const doc = await getSheet();
-        const sheet = doc.sheetsByTitle['Operacoes'];
+        
+        const sheetName = body.type === 'captacao' ? 'Captacoes' : 'Operacoes';
+        const idFieldName = body.type === 'captacao' ? 'id_captacao' : 'id_operacao';
+        
+        const sheet = doc.sheetsByTitle[sheetName];
         const rows = await sheet.getRows();
 
         // Localiza a linha correta pelo ID da operação
-        const row = rows.find(r => r.get('id_operacao') === body.id_operacao);
+        const row = rows.find(r => r.get(idFieldName) === body.id);
 
         if (!row) {
             return res.status(404).json({ error: 'Operação não encontrada' });

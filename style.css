@@ -185,6 +185,44 @@ button:active {
     flex-direction: column; 
 }
 
+/* Filtro Dashboard */
+.dashboard-filter {
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card-bg);
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: 1px solid #333;
+    width: fit-content;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.dashboard-filter label {
+    font-size: 0.75rem;
+    color: var(--text-gray);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+}
+
+.dashboard-filter select {
+    background: #000;
+    color: var(--neon-blue);
+    border: 1px solid #444;
+    padding: 6px 12px;
+    border-radius: 6px;
+    outline: none;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    transition: border-color 0.3s;
+}
+
+.dashboard-filter select:focus {
+    border-color: var(--neon-blue);
+}
+
 /* KPI Cards */
 .kpi-grid {
     display: grid;
@@ -603,14 +641,14 @@ th { color: var(--text-gray); font-weight: 400; }
         width: 100%;
         height: 70px;
         flex-direction: row;
-        padding: 0 10px;
+        padding: 5px 5px;
         position: fixed;
         bottom: 0;
         left: 0;
         border-right: none;
         border-top: 1px solid #333;
         z-index: 100;
-        justify-content: space-around;
+        justify-content: space-evenly; /* Alterado para distribuir o espaço de forma mais uniforme */
         backdrop-filter: blur(10px);
         background: rgba(22, 22, 24, 0.9);
     }
@@ -621,12 +659,15 @@ th { color: var(--text-gray); font-weight: 400; }
 
     .nav-btn {
         flex: 1;
-        padding: 5px;
-        font-size: 0.7rem;
+        padding: 5px 2px;
+        font-size: 0.62rem;
         display: flex;
         flex-direction: column;
         align-items: center;
         text-align: center;
+        white-space: normal;
+        line-height: 1.1;
+        min-width: 0;
     }
 
     .nav-btn i {

@@ -4,7 +4,9 @@ const app = {
         isLoggingOut: false,
         data: { captacoes: [], operacoes: [] },
         metaFixa: 50000, // Exemplo de meta de lucro guardado
-        deletingId: null
+        deletingId: null,
+        deletingType: 'operacao',
+        selectedCaptacao: 'all'
     },
 
     // Helper para formatar valores monetários com 2 casas decimais
@@ -42,11 +44,11 @@ const app = {
 
         titleEl.innerText = title;
         messageEl.innerText = message;
-        
+
         const icon = type === 'success' ? 'fa-circle-check' : (type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-info');
         iconBox.innerHTML = `<i class="fa-solid ${icon}"></i>`;
         iconBox.style.color = type === 'success' ? 'var(--neon-green)' : (type === 'error' ? '#ff4444' : 'var(--neon-blue)');
-        
+
         modal.classList.remove('hidden');
     },
 
@@ -79,7 +81,7 @@ const app = {
             this.init();
         } else {
             this.showAlert('As credenciais informadas estão incorretas.', 'ACESSO NEGADO', 'error');
-            
+
             // Limpar campos e resetar o foco para o usuário
             document.getElementById('login-user').value = '';
             document.getElementById('login-pass').value = '';
@@ -111,18 +113,20 @@ const app = {
             const res = await fetch('/api/get-data', {
                 headers: { 'Authorization': sessionStorage.getItem('sniper_token') }
             });
-            
+
             if (!res.ok) throw new Error("Erro na resposta do servidor");
 
             const responseData = await res.json();
             this.state.data = responseData;
-            
+
             if (responseData.config && responseData.config.meta_objetivo) {
                 this.state.metaFixa = parseFloat(responseData.config.meta_objetivo);
             }
-            
+
+            this.populateCaptacaoFilter();
             this.renderDashboard();
             this.renderTable();
+            this.renderCaptacoes();
             this.renderEarnings();
         } catch (error) {
             console.error("Falha ao carregar dados:", error);
@@ -133,9 +137,34 @@ const app = {
         }
     },
 
+    populateCaptacaoFilter() {
+        const select = document.getElementById('dashboard-captacao-filter');
+        if (!select) return;
+
+        const currentSelection = this.state.selectedCaptacao;
+        select.innerHTML = '<option value="all">Todas as Captações (Geral)</option>';
+
+        this.state.data.captacoes.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.id_captacao;
+            opt.innerText = `Captação #${c.id_captacao} (R$ ${this.formatCurrency(c.valor_pegado)})`;
+            select.appendChild(opt);
+        });
+
+        select.value = currentSelection;
+    },
+
+    handleFilterChange(val) {
+        this.state.selectedCaptacao = val;
+        this.renderDashboard();
+    },
+
     renderDashboard() {
-        const ops = this.state.data.operacoes;
-        const caps = this.state.data.captacoes;
+        let ops = this.state.data.operacoes;
+
+        if (this.state.selectedCaptacao !== 'all') {
+            ops = ops.filter(o => o.id_captacao_ref === this.state.selectedCaptacao);
+        }
 
         // Cálculos
         const lucroGuardado = ops.reduce((acc, curr) => acc + (parseFloat(curr.lucro_guardado) || 0), 0);
@@ -143,18 +172,18 @@ const app = {
         const totalUsoPessoal = ops.reduce((acc, curr) => acc + (parseFloat(curr.lucro_gastos_pessoais) || 0), 0);
 
         const capitalAtivo = ops.filter(o => o.status === 'Em Andamento')
-                                .reduce((acc, curr) => acc + (parseFloat(curr.valor_emprestado) || 0), 0);
-        
+            .reduce((acc, curr) => acc + (parseFloat(curr.valor_emprestado) || 0), 0);
+
         // Cálculos baseados em operações concluídas
         const opsFinalizadas = ops.filter(o => o.status === 'Finalizada');
 
         // ROI Médio: soma do (lucro / investimento) de cada op finalizada / total de ops
-        const roiMedio = opsFinalizadas.length > 0 
+        const roiMedio = opsFinalizadas.length > 0
             ? (opsFinalizadas.reduce((acc, curr) => {
                 const lucro = parseFloat(curr.lucro_bruto_recebido) || 0;
                 const investimento = parseFloat(curr.valor_emprestado) || 1; // evita divisão por zero
                 return acc + (lucro / investimento);
-            }, 0) / opsFinalizadas.length) * 100 
+            }, 0) / opsFinalizadas.length) * 100
             : 0;
 
         const avgLucroBruto = opsFinalizadas.length > 0 ? (totalLucroBruto / opsFinalizadas.length) : 0;
@@ -170,7 +199,7 @@ const app = {
                 const end = new Date(o.data_fim + 'T00:00:00');
                 return Math.floor((end - start) / (1000 * 60 * 60 * 24));
             });
-        
+
         const avgDays = durations.length > 0 ? (durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
 
         // Atualizar UI
@@ -216,6 +245,29 @@ const app = {
         }).join('');
     },
 
+    renderCaptacoes() {
+        const tbody = document.querySelector('#captacoes-table tbody');
+        tbody.innerHTML = this.state.data.captacoes.map(c => {
+            const quitado = String(c.quitamento_parcelas) === 'true';
+            return `
+            <tr>
+                <td data-label="Origem"><span class="badge ${c.origem === 'proprio' ? 'green' : 'blue'}">${c.origem === 'proprio' ? 'Próprio' : 'Banco'}</span></td>
+                <td data-label="Data">${c.data_emprestimo ? new Date(c.data_emprestimo + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                <td data-label="Valor Principal">R$ ${this.formatCurrency(c.valor_pegado)}</td>
+                <td data-label="Total c/ Juros">R$ ${this.formatCurrency(c.total_com_juros)}</td>
+                <td data-label="Venc.">${c.dia_vencimento || '-'}</td>
+                <td data-label="Vl. Parcela">R$ ${this.formatCurrency(c.valor_parcela)}</td>
+                <td data-label="Progresso">${c.parcelas_pagas || 0} / ${c.qtd_parcelas || 0}</td>
+                <td data-label="Status"><span class="badge ${quitado ? 'green' : 'orange'}">${quitado ? 'Quitado' : 'Ativo'}</span></td>
+                <td data-label="Ações" class="table-actions">
+                    <button class="action-btn edit-btn" onclick="app.openEditCaptacaoModal('${c.id_captacao}')" title="Editar" style="color: var(--neon-blue)"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="action-btn delete-btn" onclick="app.openDeleteModal('${c.id_captacao}', 'captacao')" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
+                </td>
+            </tr>
+        `;
+        }).join('');
+    },
+
     renderEarnings() {
         const tbody = document.querySelector('#earnings-table tbody');
         const opsFinalizadas = this.state.data.operacoes
@@ -245,7 +297,41 @@ const app = {
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         document.getElementById(`tab-${tabId}`).classList.remove('hidden');
         if (event) event.currentTarget.classList.add('active');
+        if (tabId === 'captacoes') this.renderCaptacoes();
         if (tabId === 'earnings') this.renderEarnings();
+    },
+
+    handleCaptacaoOriginChange(val) {
+        const isProprio = val === 'proprio';
+        const valorParcela = document.querySelector('#form-fields input[name="valor_parcela"]');
+        const qtdParcelas = document.querySelector('#form-fields input[name="qtd_parcelas"]');
+        const diaVencimento = document.querySelector('#form-fields input[name="dia_vencimento"]');
+        const totalJuros = document.querySelector('#form-fields input[name="total_com_juros"]');
+
+        if (valorParcela && qtdParcelas) {
+            const fields = [valorParcela, qtdParcelas, diaVencimento, totalJuros];
+            fields.forEach(f => {
+                if (!f) return;
+                f.disabled = isProprio;
+                f.style.opacity = isProprio ? '0.5' : '1';
+                if (isProprio) f.value = f.type === 'number' ? '0' : '0,00';
+            });
+        }
+    },
+
+    handleEditCaptacaoOriginChange(val) {
+        const isProprio = val === 'proprio';
+        const valorParcela = document.getElementById('edit-cap-parcela');
+        const qtdParcelas = document.getElementById('edit-cap-qtd');
+        const diaVencimento = document.getElementById('edit-cap-vencimento');
+        const totalJuros = document.getElementById('edit-cap-total-juros');
+        const pagas = document.getElementById('edit-cap-pagas');
+        const quitado = document.getElementById('edit-cap-quitado');
+
+        [valorParcela, qtdParcelas, diaVencimento, totalJuros, pagas, quitado].forEach(f => {
+            f.disabled = isProprio;
+            f.style.opacity = isProprio ? '0.5' : '1';
+        });
     },
 
     toggleFormFields() {
@@ -260,6 +346,14 @@ const app = {
         setTimeout(() => {
             if (type === 'captacao') {
                 container.innerHTML = `
+                    <div class="input-group">
+                        <label>Origem do Recurso</label>
+                        <i class="fas fa-landmark"></i>
+                        <select name="origem" onchange="app.handleCaptacaoOriginChange(this.value)">
+                            <option value="banco">Empréstimo de Banco</option>
+                            <option value="proprio">Dinheiro Próprio</option>
+                        </select>
+                    </div>
                     <div class="input-group date-input-group">
                         <label>Data</label>
                         <i class="fas fa-calendar-alt"></i>
@@ -270,18 +364,35 @@ const app = {
                         <i class="fas fa-hand-holding-usd"></i>
                         <input type="text" name="valor_pegado" placeholder="0,00" required oninput="app.handleInputCurrency(this)" onfocus="app.handleFocusCurrency(this)" onblur="app.handleBlurCurrency(this)">
                     </div>
+                    
                     <div class="grid-2-col">
                         <div class="input-group">
                             <label>Valor Parcela (R$)</label>
                             <i class="fas fa-receipt"></i>
-                            <input type="text" name="valor_parcela" placeholder="0,00" oninput="app.handleInputCurrency(this)" onfocus="app.handleFocusCurrency(this)" onblur="app.handleBlurCurrency(this)">
+                            <input type="text" name="valor_parcela" placeholder="0,00" oninput="app.handleInputCurrency(this); app.updateCaptacaoTotal()" onfocus="app.handleFocusCurrency(this)" onblur="app.handleBlurCurrency(this); app.updateCaptacaoTotal()">
                         </div>
                         <div class="input-group">
                             <label>Qtd. Parcelas</label>
                             <i class="fas fa-list-ol"></i>
-                            <input type="number" name="qtd_parcelas" placeholder="12">
+                            <input type="number" name="qtd_parcelas" placeholder="12" oninput="app.updateCaptacaoTotal()" onblur="app.updateCaptacaoTotal()">
                         </div>
                     </div>
+
+                    <div class="grid-2-col">
+                        <div class="input-group">
+                            <label>Total c/ Juros (R$)</label>
+                            <i class="fas fa-hand-holding-dollar"></i>
+                            <input type="text" name="total_com_juros" placeholder="0,00" readonly style="opacity: 0.8; cursor: not-allowed;">
+                        </div>
+                        <div class="input-group">
+                            <label>Dia Vencimento</label>
+                            <i class="fas fa-calendar-day"></i>
+                            <input type="number" name="dia_vencimento" placeholder="DD" min="1" max="31">
+                        </div>
+                    </div>
+
+                    <input type="hidden" name="parcelas_pagas" value="0">
+                    <input type="hidden" name="quitamento_parcelas" value="false">
                 `;
             } else {
                 const options = this.state.data.captacoes.map(c => `<option value="${c.id_captacao}">Captação #${c.id_captacao} (R$ ${this.formatCurrency(c.valor_pegado)})</option>`);
@@ -313,12 +424,13 @@ const app = {
         e.preventDefault();
         const formData = new FormData(e.target);
         let data = Object.fromEntries(formData.entries());
-        
+
         // Limpar campos monetários antes de enviar
         if (data.valor_pegado) data.valor_pegado = this.parseCurrency(data.valor_pegado);
         if (data.valor_parcela) data.valor_parcela = this.parseCurrency(data.valor_parcela);
+        if (data.total_com_juros) data.total_com_juros = this.parseCurrency(data.total_com_juros);
         if (data.valor_emprestado) data.valor_emprestado = this.parseCurrency(data.valor_emprestado);
-        
+
         data.type = document.getElementById('entry-type').value;
 
         const btn = e.target.querySelector('button[type="submit"]');
@@ -331,7 +443,7 @@ const app = {
 
         const res = await fetch('/api/add-data', {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Authorization': sessionStorage.getItem('sniper_token'),
                 'Content-Type': 'application/json'
             },
@@ -361,10 +473,10 @@ const app = {
         document.getElementById('edit-lucro-guardado').value = this.formatCurrency(0);
         document.getElementById('edit-lucro-parcela').value = this.formatCurrency(0);
         document.getElementById('edit-lucro-pessoal').value = this.formatCurrency(0);
-        
+
         // Define "Finalizada" como padrão ao abrir, agilizando o fechamento da operação
         document.getElementById('edit-status').value = 'Finalizada';
-        
+
         this.toggleEditProfitFields();
         document.getElementById('edit-modal').classList.remove('hidden');
     },
@@ -372,12 +484,12 @@ const app = {
     toggleEditProfitFields() {
         const status = document.getElementById('edit-status').value;
         const isFinalizada = status === 'Finalizada';
-        
+
         const fields = [
-            'edit-lucro-bruto', 
-            'edit-data-fim', 
-            'edit-lucro-guardado', 
-            'edit-lucro-parcela', 
+            'edit-lucro-bruto',
+            'edit-data-fim',
+            'edit-lucro-guardado',
+            'edit-lucro-parcela',
             'edit-lucro-pessoal'
         ];
 
@@ -410,7 +522,7 @@ const app = {
             if (!lucroBruto || !dataFim || (somaDistribuicao === 0)) {
                 return this.showAlert('Para finalizar, preencha o lucro bruto, a data e a distribuição do lucro.', 'DADOS INCOMPLETOS', 'error');
             }
-            
+
             if (Math.abs(lucroBruto - somaDistribuicao) > 0.01) {
                 return this.showAlert(`A soma da distribuição (R$ ${this.formatCurrency(somaDistribuicao)}) deve ser igual ao lucro bruto (R$ ${this.formatCurrency(lucroBruto)}). Por favor, ajuste os valores.`, 'ERRO DE DISTRIBUIÇÃO DO LUCRO', 'error');
             }
@@ -437,7 +549,7 @@ const app = {
         try {
             const res = await fetch('/api/update-data', {
                 method: 'PUT',
-                headers: { 
+                headers: {
                     'Authorization': sessionStorage.getItem('sniper_token'),
                     'Content-Type': 'application/json'
                 },
@@ -446,10 +558,10 @@ const app = {
 
             if (res.ok) {
                 this.closeModal();
-                const successMsg = status === 'Finalizada' 
-                    ? 'A operação foi atualizada com os valores de distribuição de lucros.' 
+                const successMsg = status === 'Finalizada'
+                    ? 'A operação foi atualizada com os valores de distribuição de lucros.'
                     : 'A operação foi atualizada com sucesso para Em Andamento.';
-                
+
                 this.showAlert(successMsg, 'SUCESSO', 'success');
                 this.loadData();
             } else {
@@ -467,8 +579,95 @@ const app = {
 
     closeModal() { document.getElementById('edit-modal').classList.add('hidden'); },
 
-    openDeleteModal(id) {
+    updateCaptacaoTotal() {
+        const elParcela = document.querySelector('#form-fields input[name="valor_parcela"]');
+        const elQtd = document.querySelector('#form-fields input[name="qtd_parcelas"]');
+        const elTotal = document.querySelector('#form-fields input[name="total_com_juros"]');
+
+        if (elParcela && elQtd && elTotal) {
+            const v = this.parseCurrency(elParcela.value);
+            const q = parseInt(elQtd.value) || 0;
+            elTotal.value = this.formatCurrency(v * q);
+        }
+    },
+
+    updateEditCaptacaoTotal() {
+        const elParcela = document.getElementById('edit-cap-parcela');
+        const elQtd = document.getElementById('edit-cap-qtd');
+        const elTotal = document.getElementById('edit-cap-total-juros');
+
+        if (elParcela && elQtd && elTotal) {
+            const v = this.parseCurrency(elParcela.value);
+            const q = parseInt(elQtd.value) || 0;
+            elTotal.value = this.formatCurrency(v * q);
+        }
+    },
+
+    openEditCaptacaoModal(id) {
+        const cap = this.state.data.captacoes.find(c => c.id_captacao == id);
+        document.getElementById('edit-cap-id').value = id;
+        document.getElementById('edit-cap-origem').value = cap.origem || 'banco';
+        document.getElementById('edit-cap-valor').value = this.formatCurrency(cap.valor_pegado);
+        document.getElementById('edit-cap-total-juros').value = this.formatCurrency(cap.total_com_juros);
+        document.getElementById('edit-cap-vencimento').value = cap.dia_vencimento || '';
+        document.getElementById('edit-cap-parcela').value = this.formatCurrency(cap.valor_parcela);
+        document.getElementById('edit-cap-qtd').value = cap.qtd_parcelas;
+        document.getElementById('edit-cap-pagas').value = cap.parcelas_pagas || 0;
+        document.getElementById('edit-cap-quitado').value = String(cap.quitamento_parcelas) === 'true' ? 'true' : 'false';
+
+        this.handleEditCaptacaoOriginChange(cap.origem || 'banco');
+        document.getElementById('edit-captacao-modal').classList.remove('hidden');
+    },
+
+    async handleUpdateCaptacao(e) {
+        e.preventDefault();
+        const payload = {
+            type: 'captacao',
+            id_captacao: document.getElementById('edit-cap-id').value,
+            origem: document.getElementById('edit-cap-origem').value,
+            valor_pegado: this.parseCurrency(document.getElementById('edit-cap-valor').value),
+            total_com_juros: this.parseCurrency(document.getElementById('edit-cap-total-juros').value),
+            dia_vencimento: document.getElementById('edit-cap-vencimento').value,
+            valor_parcela: this.parseCurrency(document.getElementById('edit-cap-parcela').value),
+            qtd_parcelas: document.getElementById('edit-cap-qtd').value,
+            parcelas_pagas: document.getElementById('edit-cap-pagas').value,
+            quitamento_parcelas: document.getElementById('edit-cap-quitado').value
+        };
+
+        const btn = e.target.querySelector('button[type="submit"]');
+        const originalContent = btn.innerHTML;
+
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando...';
+        btn.style.pointerEvents = 'none';
+        btn.style.opacity = '0.7';
+
+        try {
+            const res = await fetch('/api/update-data', {
+                method: 'PUT',
+                headers: {
+                    'Authorization': sessionStorage.getItem('sniper_token'),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                document.getElementById('edit-captacao-modal').classList.add('hidden');
+                this.showAlert('Captação atualizada com sucesso.', 'SUCESSO', 'success');
+                this.loadData();
+            }
+        } catch (error) {
+            this.showAlert('Erro ao atualizar captação.', 'ERRO', 'error');
+        } finally {
+            btn.innerHTML = originalContent;
+            btn.style.pointerEvents = 'auto';
+            btn.style.opacity = '1';
+        }
+    },
+
+    openDeleteModal(id, type = 'operacao') {
         this.state.deletingId = id;
+        this.state.deletingType = type;
         document.getElementById('delete-modal').classList.remove('hidden');
     },
 
@@ -479,10 +678,10 @@ const app = {
 
     async handleDelete() {
         if (!this.state.deletingId) return;
-        
+
         const btn = document.getElementById('btn-confirm-delete');
         const originalContent = btn.innerHTML;
-        
+
         // Estado de carregamento
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Removendo...';
         btn.style.pointerEvents = 'none';
@@ -491,11 +690,14 @@ const app = {
         try {
             const res = await fetch('/api/delete-data', {
                 method: 'DELETE',
-                headers: { 
+                headers: {
                     'Authorization': sessionStorage.getItem('sniper_token'),
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ id_operacao: this.state.deletingId })
+                body: JSON.stringify({
+                    id: this.state.deletingId,
+                    type: this.state.deletingType
+                })
             });
 
             if (res.ok) {
@@ -514,14 +716,14 @@ const app = {
         }
     },
 
-    openInfoModal() { 
+    openInfoModal() {
         // Sincroniza o valor do input com a meta salva no estado antes de abrir
         const input = document.getElementById('input-meta-objetivo');
         input.value = this.formatCurrency(this.state.metaFixa);
-        document.getElementById('info-modal').classList.remove('hidden'); 
+        document.getElementById('info-modal').classList.remove('hidden');
     },
 
-    closeInfoModal() { 
+    closeInfoModal() {
         document.getElementById('info-modal').classList.add('hidden');
         // Reseta o valor caso o usuário tenha alterado mas não salvado
         document.getElementById('input-meta-objetivo').value = this.formatCurrency(this.state.metaFixa);
@@ -576,9 +778,9 @@ const app = {
         const input = document.getElementById('input-meta-objetivo');
         const btnEdit = document.getElementById('btn-edit-meta');
         const btnSave = document.getElementById('btn-save-meta');
-        
+
         input.readOnly = !active;
-        
+
         if (active) {
             btnEdit.classList.add('hidden');
             btnSave.classList.remove('hidden');
@@ -603,7 +805,7 @@ const app = {
 
         const res = await fetch('/api/update-config', {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Authorization': sessionStorage.getItem('sniper_token'),
                 'Content-Type': 'application/json'
             },

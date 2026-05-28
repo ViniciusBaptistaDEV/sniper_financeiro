@@ -35,6 +35,8 @@
             <button class="nav-btn active" onclick="app.switchTab('dashboard')"><i class="fas fa-chart-line"></i>
                 Dashboard</button>
             <button class="nav-btn" onclick="app.switchTab('view')"><i class="fas fa-list-ul"></i> Operações</button>
+            <button class="nav-btn" onclick="app.switchTab('captacoes')"><i class="fas fa-landmark"></i>
+                Captações</button>
             <button class="nav-btn" onclick="app.switchTab('earnings')"><i class="fas fa-sack-dollar"></i> Extrato
                 Lucros</button>
             <button class="nav-btn" onclick="app.switchTab('add')"><i class="fas fa-plus-circle"></i> Novo
@@ -46,6 +48,14 @@
         <main class="content">
             <!-- ABA 1: DASHBOARD -->
             <section id="tab-dashboard" class="tab-content">
+                <!-- Filtro de Captação -->
+                <div class="dashboard-filter">
+                    <label><i class="fas fa-filter"></i> Filtrar por Captação:</label>
+                    <select id="dashboard-captacao-filter" onchange="app.handleFilterChange(this.value)">
+                        <option value="all">Todas as Captações (Geral)</option>
+                    </select>
+                </div>
+
                 <div class="kpi-grid">
                     <!-- PRIMEIRA LINHA -->
                     <div class="kpi-card neon-green">
@@ -148,6 +158,28 @@
                 </div>
             </section>
 
+            <!-- ABA: GESTÃO DE CAPTAÇÕES -->
+            <section id="tab-captacoes" class="tab-content hidden">
+                <div class="table-container">
+                    <table id="captacoes-table">
+                        <thead>
+                            <tr>
+                                <th>Origem</th>
+                                <th>Data</th>
+                                <th>Valor Principal</th>
+                                <th>Total c/ Juros</th>
+                                <th>Venc.</th>
+                                <th>Vl. Parcela</th>
+                                <th>Progresso</th>
+                                <th>Status</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
             <!-- ABA 2: VISUALIZAR/EDITAR -->
             <section id="tab-view" class="tab-content hidden">
                 <div class="table-container">
@@ -181,8 +213,8 @@
                         <label>Tipo de Registro</label>
                         <i class="fas fa-exchange-alt"></i>
                         <select id="entry-type" onchange="app.toggleFormFields()">
-                            <option value="captacao">Nova Captação (Passivo/Banco)</option>
-                            <option value="operacao">Nova Operação (Ativo/Empréstimo)</option>
+                            <option value="captacao">Captação de Fundos</option>
+                            <option value="operacao">Aplicação de Capital</option>
                         </select>
                     </div>
 
@@ -270,6 +302,85 @@
                 <div class="modal-actions">
                     <button type="button" onclick="app.closeModal()">Cancelar</button>
                     <button type="submit" class="save-btn">Atualizar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Edição de Captação -->
+    <div id="edit-captacao-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3 style="margin-bottom: 20px; color: var(--neon-blue);"><i class="fas fa-edit"></i> ATUALIZAR CAPTAÇÃO
+            </h3>
+            <form id="edit-captacao-form" onsubmit="app.handleUpdateCaptacao(event)">
+                <input type="hidden" id="edit-cap-id">
+
+                <div class="input-group">
+                    <label>Origem do Recurso</label>
+                    <i class="fas fa-landmark"></i>
+                    <select id="edit-cap-origem" onchange="app.handleEditCaptacaoOriginChange(this.value)">
+                        <option value="banco">Empréstimo de Banco</option>
+                        <option value="proprio">Dinheiro Próprio</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label>Valor Principal (R$)</label>
+                    <i class="fas fa-hand-holding-usd"></i>
+                    <input type="text" id="edit-cap-valor" oninput="app.handleInputCurrency(this)"
+                        onfocus="app.handleFocusCurrency(this)" onblur="app.handleBlurCurrency(this)">
+                </div>
+
+                
+
+                <div class="grid-2-col">
+                    <div class="input-group">
+                        <label>Valor Parcela (R$)</label>
+                        <i class="fas fa-receipt"></i>
+                        <input type="text" id="edit-cap-parcela" oninput="app.handleInputCurrency(this); app.updateEditCaptacaoTotal()"
+                            onfocus="app.handleFocusCurrency(this)" onblur="app.handleBlurCurrency(this); app.updateEditCaptacaoTotal()">
+                    </div>
+                    <div class="input-group">
+                        <label>Qtd. Parcelas</label>
+                        <i class="fas fa-list-ol"></i>
+                        <input type="number" id="edit-cap-qtd" oninput="app.updateEditCaptacaoTotal()" onblur="app.updateEditCaptacaoTotal()">
+                    </div>
+                </div>
+
+                <div class="grid-2-col">
+                    <div class="input-group">
+                        <label>Total com Juros (R$)</label>
+                        <i class="fas fa-hand-holding-dollar"></i>
+                        <input type="text" id="edit-cap-total-juros" readonly style="opacity: 0.8; cursor: not-allowed;">
+                    </div>
+                    <div class="input-group">
+                        <label>Dia Vencimento</label>
+                        <i class="fas fa-calendar-day"></i>
+                        <input type="number" id="edit-cap-vencimento" min="1" max="31">
+                    </div>
+                </div>
+
+                <div class="grid-2-col" style="border-top: 1px solid #333; padding-top: 15px; margin-top: 10px;">
+                    <div class="input-group">
+                        <label>Parcelas Pagas</label>
+                        <i class="fas fa-check-double"></i>
+                        <input type="number" id="edit-cap-pagas" min="0">
+                    </div>
+                    <div class="input-group">
+                        <label>Status Quitação</label>
+                        <i class="fas fa-flag-checkered"></i>
+                        <select id="edit-cap-quitado">
+                            <option value="false">Em Aberto</option>
+                            <option value="true">Quitado</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button"
+                        onclick="document.getElementById('edit-captacao-modal').classList.add('hidden')">Cancelar</button>
+                    <button type="submit" class="save-btn"
+                        style="background: var(--neon-blue) !important;">Atualizar</button>
                 </div>
             </form>
         </div>

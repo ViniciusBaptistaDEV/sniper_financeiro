@@ -10,6 +10,25 @@ module.exports = async function handler(req, res) {
 
         const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
         const doc = await getSheet();
+        
+        if (body.type === 'captacao') {
+            const sheet = doc.sheetsByTitle['Captacoes'];
+            const rows = await sheet.getRows();
+            const row = rows.find(r => r.get('id_captacao') === body.id_captacao);
+            if (!row) return res.status(404).json({ error: 'Captação não encontrada' });
+
+            row.set('origem', body.origem);
+            row.set('valor_pegado', body.valor_pegado);
+            row.set('valor_parcela', body.valor_parcela);
+            row.set('qtd_parcelas', body.qtd_parcelas);
+            row.set('dia_vencimento', body.dia_vencimento);
+            row.set('total_com_juros', body.total_com_juros);
+            row.set('parcelas_pagas', body.parcelas_pagas);
+            row.set('quitamento_parcelas', body.quitamento_parcelas);
+            await row.save();
+            return res.status(200).json({ success: true });
+        }
+
         const sheet = doc.sheetsByTitle['Operacoes'];
         const rows = await sheet.getRows();
         

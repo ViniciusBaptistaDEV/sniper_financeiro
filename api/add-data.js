@@ -15,10 +15,15 @@ module.exports = async function handler(req, res) {
             const sheet = doc.sheetsByTitle['Captacoes'];
             await sheet.addRow({
                 id_captacao: Date.now().toString(),
+                origem: body.origem || 'banco',
                 data_emprestimo: body.data_emprestimo,
                 valor_pegado: body.valor_pegado,
                 valor_parcela: body.valor_parcela || 0,
-                qtd_parcelas: body.qtd_parcelas || 1
+                qtd_parcelas: body.qtd_parcelas || 1,
+                dia_vencimento: body.dia_vencimento || '',
+                total_com_juros: body.total_com_juros || 0,
+                parcelas_pagas: body.parcelas_pagas || 0,
+                quitamento_parcelas: body.quitamento_parcelas || 'false'
             });
         } else if (body.type === 'operacao') {
             const sheet = doc.sheetsByTitle['Operacoes'];
