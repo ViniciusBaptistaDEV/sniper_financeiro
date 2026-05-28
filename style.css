@@ -124,7 +124,7 @@ button:active {
 #app-content { display: flex; min-height: 100vh; }
 
 .sidebar {
-    width: 200px;
+    width: 240px;
     background: var(--card-bg);
     border-right: 1px solid #222;
     padding: 2rem 1rem;
@@ -143,6 +143,10 @@ button:active {
     gap: 10px;
 }
 
+.sidebar .logo span {
+    color: var(--text-white);
+}
+
 .neon-btn-lg i {
     margin-right: 10px;
 }
@@ -155,6 +159,7 @@ button:active {
     text-align: left;
     cursor: pointer;
     font-size: 1rem;
+    white-space: nowrap;
     transition: 0.3s;
 }
 
@@ -174,7 +179,7 @@ button:active {
 /* KPI Cards */
 .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(4, 1fr);
     gap: 1.5rem;
     margin-bottom: 2rem;
 }
@@ -191,10 +196,22 @@ button:active {
 .neon-yellow { border-left-color: var(--neon-yellow); }
 .neon-orange { border-left-color: var(--neon-orange); }
 
-.kpi-card span { font-size: 0.8rem; color: var(--text-gray); text-transform: uppercase; }
+.kpi-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.kpi-card span { font-size: 0.8rem; color: var(--text-gray); text-transform: uppercase; white-space: nowrap; }
 .kpi-card h2 { margin: 0.5rem 0 0; font-size: 1.6rem; }
 
 /* Progress Bar */
+.progress-section {
+    /* Margem generosa para o Desktop */
+    margin-top: 10rem;
+}
+
 .progress-container {
     width: 100%;
     height: 12px;
@@ -300,6 +317,47 @@ table { width: 100%; border-collapse: collapse; background: var(--card-bg); bord
 th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #222; }
 th { color: var(--text-gray); font-weight: 400; }
 
+/* Alinhamento das ações */
+.table-actions {
+    display: flex;
+    gap: 12px;
+}
+
+/* Botões de Ação na Tabela */
+.action-btn {
+    background: transparent;
+    border: none;
+    font-size: 1.2rem;
+    padding: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    color: var(--text-gray);
+}
+
+.edit-btn {
+    color: var(--neon-green);
+    filter: drop-shadow(0 0 5px rgba(0, 255, 136, 0.4));
+}
+
+.edit-btn:hover {
+    transform: scale(1.2) rotate(-5deg);
+    filter: drop-shadow(0 0 10px var(--neon-green));
+    color: #fff;
+}
+
+.delete-btn {
+    color: #ff4444;
+    filter: drop-shadow(0 0 5px rgba(255, 68, 68, 0.4));
+}
+
+.delete-btn:hover {
+    transform: scale(1.2) rotate(5deg);
+    filter: drop-shadow(0 0 10px #ff4444);
+    color: #fff;
+}
+
 /* Modals */
 .modal {
     position: fixed;
@@ -316,7 +374,28 @@ th { color: var(--text-gray); font-weight: 400; }
     padding: 2rem;
     border-radius: 8px;
     width: 95%;
-    max-width: 400px;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    border: 1px solid #333;
+}
+
+/* Scrollbar estilizada para o Modal */
+.modal-content::-webkit-scrollbar {
+    width: 5px;
+}
+.modal-content::-webkit-scrollbar-track {
+    background: #000;
+}
+.modal-content::-webkit-scrollbar-thumb {
+    background: var(--neon-green);
+    border-radius: 10px;
+}
+
+.distribution-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
 }
 
 .modal-content input, .modal-content select {
@@ -460,6 +539,11 @@ th { color: var(--text-gray); font-weight: 400; }
 
 /* Alert Modal Custom Styles */
 
+/* Esconder elementos mobile no desktop */
+.mobile-logout-wrapper, .mobile-header {
+    display: none;
+}
+
 /* --- RESPONSIVIDADE (MOBILE & TABLET) --- */
 
 @media (max-width: 768px) {
@@ -467,17 +551,60 @@ th { color: var(--text-gray); font-weight: 400; }
         flex-direction: column;
     }
 
+    .mobile-header {
+        display: block;
+        text-align: center;
+        padding: 1.2rem;
+        background: var(--card-bg);
+        border-bottom: 1px solid #222;
+        font-weight: 700;
+        font-size: 1.1rem;
+        letter-spacing: 2px;
+        color: var(--neon-green);
+    }
+
+    .mobile-header span {
+        color: var(--text-white);
+    }
+
+    .mobile-logout-wrapper {
+        display: flex !important;
+        justify-content: center;
+        margin-top: 50px;
+        padding-bottom: 30px;
+    }
+
+    .logout-btn-mobile {
+        width: 100%;
+        max-width: 280px;
+        padding: 15px;
+        background: rgba(255, 68, 68, 0.05);
+        border: 1px solid #ff4444;
+        color: #ff4444;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+
     .sidebar {
         width: 100%;
+        height: 70px;
         flex-direction: row;
-        padding: 0.5rem;
-        position: sticky;
-        top: 0;
-        z-index: 100;
+        padding: 0 10px;
+        position: fixed;
+        bottom: 0;
+        left: 0;
         border-right: none;
-        border-bottom: 1px solid #222;
-        gap: 5px;
-        overflow-x: auto;
+        border-top: 1px solid #333;
+        z-index: 100;
+        justify-content: space-around;
+        backdrop-filter: blur(10px);
+        background: rgba(22, 22, 24, 0.9);
     }
 
     .sidebar .logo {
@@ -486,13 +613,12 @@ th { color: var(--text-gray); font-weight: 400; }
 
     .nav-btn {
         flex: 1;
-        padding: 10px 5px;
+        padding: 5px;
         font-size: 0.7rem;
         display: flex;
         flex-direction: column;
         align-items: center;
         text-align: center;
-        min-width: 80px;
     }
 
     .nav-btn i {
@@ -501,17 +627,73 @@ th { color: var(--text-gray); font-weight: 400; }
         font-size: 1.1rem;
     }
 
+    .nav-btn.active {
+        color: var(--neon-green);
+        text-shadow: 0 0 10px var(--neon-green);
+    }
+
     .logout-btn {
         margin-top: 0;
-        padding: 10px;
+        padding: 5px;
+        border: none;
+        font-size: 0.7rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
 
     .content {
-        padding: 1rem;
+        padding: 1rem 1rem 100px 1rem; /* Padding bottom para não cobrir o menu */
     }
 
     .kpi-grid {
         grid-template-columns: 1fr 1fr;
+    }
+
+    /* Transformação da Tabela em Cards */
+    .table-container {
+        background: transparent;
+        border: none;
+    }
+
+    table, thead, tbody, th, td, tr { 
+        display: block; 
+        width: 100%;
+    }
+
+    thead { display: none; } /* Esconde o cabeçalho original */
+
+    tr {
+        background: var(--card-bg);
+        margin-bottom: 1.5rem;
+        border-radius: 12px;
+        padding: 1rem;
+        border: 1px solid #222;
+        border-left: 4px solid var(--neon-green);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+
+    td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.8rem 0;
+        border-bottom: 1px solid #ffffff05;
+        text-align: right;
+        min-height: 45px;
+    }
+
+    td::before {
+        content: attr(data-label);
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.65rem;
+        color: var(--text-gray);
+        letter-spacing: 1px;
+    }
+
+    .table-actions {
+        justify-content: flex-end;
     }
 
     .grid-2-col {
@@ -519,14 +701,9 @@ th { color: var(--text-gray); font-weight: 400; }
         gap: 0;
     }
 
-    .table-container {
-        overflow-x: auto;
-        background: var(--card-bg);
-        border-radius: 8px;
-    }
-
-    table {
-        min-width: 600px; /* Impede que a tabela esmague os dados */
+    .progress-section {
+        /* Margem reduzida para não empurrar muito no Mobile */
+        margin-top: 1.5rem;
     }
 }
 
@@ -591,4 +768,88 @@ th { color: var(--text-gray); font-weight: 400; }
 .logout-btn:hover {
     background: #ff4444;
     color: white;
+}
+
+/* Estilos do Loading Futurista */
+.loading-content {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+}
+
+.spinner-box {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.circle-border {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    padding: 3px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    background: linear-gradient(0deg, rgba(0, 255, 136, 0.1) 33%, var(--neon-green) 100%);
+    animation: spin 0.8s linear infinite;
+}
+
+.circle-core {
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg-dark);
+    border-radius: 50%;
+}
+
+.loading-icon {
+    position: absolute;
+    color: var(--neon-green);
+    font-size: 1.5rem;
+    filter: drop-shadow(0 0 10px var(--neon-green));
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.loading-text {
+    color: var(--neon-green);
+    font-size: 0.8rem;
+    letter-spacing: 4px;
+    font-weight: 700;
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.2); opacity: 1; }
+}
+
+/* Estilo Específico para Modal de Exclusão */
+.delete-box {
+    border: 1px solid #ff4444 !important;
+    text-align: center;
+}
+
+.delete-icon-box {
+    font-size: 3.5rem;
+    margin-bottom: 1rem;
+    color: #ff4444;
+    text-shadow: 0 0 15px rgba(255, 68, 68, 0.5);
+}
+
+.confirm-delete-btn {
+    background: #ff4444 !important;
+    color: white !important;
+    border: none !important;
+    font-weight: 600;
 }

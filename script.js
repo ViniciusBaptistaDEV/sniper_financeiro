@@ -3,7 +3,8 @@ const app = {
         isLogged: false,
         isLoggingOut: false,
         data: { captacoes: [], operacoes: [] },
-        metaFixa: 50000 // Exemplo de meta de lucro guardado
+        metaFixa: 50000, // Exemplo de meta de lucro guardado
+        deletingId: null
     },
 
     // Helper para formatar valores monetários com 2 casas decimais
@@ -101,19 +102,35 @@ const app = {
         await this.loadData();
     },
 
+    showLoading() { document.getElementById('loading-modal').classList.remove('hidden'); },
+    hideLoading() { document.getElementById('loading-modal').classList.add('hidden'); },
+
     async loadData() {
-        const res = await fetch('/api/get-data', {
-            headers: { 'Authorization': sessionStorage.getItem('sniper_token') }
-        });
-        const responseData = await res.json();
-        this.state.data = responseData;
-        
-        if (responseData.config && responseData.config.meta_objetivo) {
-            this.state.metaFixa = parseFloat(responseData.config.meta_objetivo);
+        this.showLoading();
+        try {
+            const res = await fetch('/api/get-data', {
+                headers: { 'Authorization': sessionStorage.getItem('sniper_token') }
+            });
+            
+            if (!res.ok) throw new Error("Erro na resposta do servidor");
+
+            const responseData = await res.json();
+            this.state.data = responseData;
+            
+            if (responseData.config && responseData.config.meta_objetivo) {
+                this.state.metaFixa = parseFloat(responseData.config.meta_objetivo);
+            }
+            
+            this.renderDashboard();
+            this.renderTable();
+            this.renderEarnings();
+        } catch (error) {
+            console.error("Falha ao carregar dados:", error);
+            this.showAlert('Não foi possível sincronizar os dados com a planilha.', 'ERRO DE CONEXÃO', 'error');
+        } finally {
+            // Pequeno delay apenas para a animação não "piscar" em conexões muito rápidas
+            setTimeout(() => this.hideLoading(), 500);
         }
-        
-        this.renderDashboard();
-        this.renderTable();
     },
 
     renderDashboard() {
@@ -122,6 +139,9 @@ const app = {
 
         // Cálculos
         const lucroGuardado = ops.reduce((acc, curr) => acc + (parseFloat(curr.lucro_guardado) || 0), 0);
+        const totalLucroBruto = ops.reduce((acc, curr) => acc + (parseFloat(curr.lucro_bruto_recebido) || 0), 0);
+        const totalUsoPessoal = ops.reduce((acc, curr) => acc + (parseFloat(curr.lucro_gastos_pessoais) || 0), 0);
+
         const capitalAtivo = ops.filter(o => o.status === 'Em Andamento')
                                 .reduce((acc, curr) => acc + (parseFloat(curr.valor_emprestado) || 0), 0);
         
@@ -131,11 +151,32 @@ const app = {
             ? (opsFinalizadas.reduce((acc, curr) => acc + (curr.lucro_bruto_recebido / curr.valor_emprestado), 0) / opsFinalizadas.length) * 100 
             : 0;
 
+        const avgLucroBruto = opsFinalizadas.length > 0 ? (totalLucroBruto / opsFinalizadas.length) : 0;
+
+        // Lucro Projetado: Capital na rua * ROI Médio (em decimal)
+        const lucroProjetado = capitalAtivo * (roiMedio / 100);
+
+        // Cálculo de Duração Média (Ciclo de Retorno)
+        const durations = opsFinalizadas
+            .filter(o => o.data_inicio && o.data_fim)
+            .map(o => {
+                const start = new Date(o.data_inicio + 'T00:00:00');
+                const end = new Date(o.data_fim + 'T00:00:00');
+                return Math.floor((end - start) / (1000 * 60 * 60 * 24));
+            });
+        
+        const avgDays = durations.length > 0 ? (durations.reduce((a, b) => a + b, 0) / durations.length) : 0;
+
         // Atualizar UI
+        document.getElementById('kpi-avg-lucro-bruto').innerText = `R$ ${this.formatCurrency(avgLucroBruto)}`;
         document.getElementById('kpi-lucro-guardado').innerText = `R$ ${this.formatCurrency(lucroGuardado)}`;
         document.getElementById('kpi-capital-ativo').innerText = `R$ ${this.formatCurrency(capitalAtivo)}`;
         document.getElementById('kpi-roi').innerText = `${roiMedio.toFixed(2)}%`;
-        
+        document.getElementById('kpi-avg-days').innerText = `${Math.round(avgDays)} dias`;
+        document.getElementById('kpi-total-lucro-bruto').innerText = `R$ ${this.formatCurrency(totalLucroBruto)}`;
+        document.getElementById('kpi-total-pessoal').innerText = `R$ ${this.formatCurrency(totalUsoPessoal)}`;
+        document.getElementById('kpi-lucro-projetado').innerText = `R$ ${this.formatCurrency(lucroProjetado)}`;
+
         // Barra de Progresso
         const perc = Math.min((lucroGuardado / this.state.metaFixa) * 100, 100);
         document.getElementById('progress-bar').style.width = `${perc}%`;
@@ -145,22 +186,60 @@ const app = {
 
     renderTable() {
         const tbody = document.querySelector('#ops-table tbody');
-        tbody.innerHTML = this.state.data.operacoes.map(op => `
+        tbody.innerHTML = this.state.data.operacoes.map(op => {
+            let durationText = '-';
+            if (op.status === 'Finalizada' && op.data_inicio && op.data_fim) {
+                const start = new Date(op.data_inicio + 'T00:00:00');
+                const end = new Date(op.data_fim + 'T00:00:00');
+                durationText = `${Math.floor((end - start) / 86400000)} dias`;
+            }
+            return `
             <tr>
-                <td>${op.data_inicio}</td>
-                <td>R$ ${this.formatCurrency(op.valor_emprestado)}</td>
-                <td>R$ ${this.formatCurrency(op.lucro_bruto_recebido)}</td>
-                <td><span class="badge ${op.status === 'Finalizada' ? 'green' : 'blue'}">${op.status}</span></td>
-                <td><button onclick="app.openEditModal('${op.id_operacao}')">Editar</button></td>
+                <td data-label="Início">${op.data_inicio ? new Date(op.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                <td data-label="Fim">${op.status === 'Finalizada' ? (op.data_fim ? new Date(op.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '-') : '<span style="font-size: 0.75rem; opacity: 0.7; font-style: italic;">Aguardando finalização...</span>'}</td>
+                <td data-label="Valor">R$ ${this.formatCurrency(op.valor_emprestado)}</td>
+                <td data-label="Lucro Bruto">R$ ${this.formatCurrency(op.lucro_bruto_recebido)}</td>
+                <td data-label="Status"><span class="badge ${op.status === 'Finalizada' ? 'green' : 'blue'}">${op.status}</span></td>
+                <td data-label="Duração">${durationText}</td>
+                <td data-label="Ações" class="table-actions">
+                    <button class="action-btn edit-btn" onclick="app.openEditModal('${op.id_operacao}')" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="action-btn delete-btn" onclick="app.openDeleteModal('${op.id_operacao}')" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
+                </td>
             </tr>
-        `).join('');
+        `;
+        }).join('');
+    },
+
+    renderEarnings() {
+        const tbody = document.querySelector('#earnings-table tbody');
+        const opsFinalizadas = this.state.data.operacoes
+            .filter(o => o.status === 'Finalizada')
+            .sort((a, b) => new Date(b.data_fim) - new Date(a.data_fim));
+
+        tbody.innerHTML = opsFinalizadas.map(op => {
+            const start = new Date(op.data_inicio + 'T00:00:00');
+            const end = new Date(op.data_fim + 'T00:00:00');
+            const duration = Math.floor((end - start) / 86400000);
+            return `
+            <tr>
+                <td data-label="Início">${op.data_inicio ? new Date(op.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                <td data-label="Fim">${op.data_fim ? new Date(op.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                <td data-label="Lucro Bruto" style="color: var(--neon-green)">R$ ${this.formatCurrency(op.lucro_bruto_recebido)}</td>
+                <td data-label="Reserva">R$ ${this.formatCurrency(op.lucro_guardado)}</td>
+                <td data-label="Banco">R$ ${this.formatCurrency(op.lucro_usado_parcela)}</td>
+                <td data-label="Pessoal">R$ ${this.formatCurrency(op.lucro_gastos_pessoais)}</td>
+                <td data-label="Duração">${duration} dias</td>
+            </tr>
+        `;
+        }).join('');
     },
 
     switchTab(tabId) {
         document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         document.getElementById(`tab-${tabId}`).classList.remove('hidden');
-        event.currentTarget.classList.add('active');
+        if (event) event.currentTarget.classList.add('active');
+        if (tabId === 'earnings') this.renderEarnings();
     },
 
     toggleFormFields() {
@@ -272,25 +351,72 @@ const app = {
         const op = this.state.data.operacoes.find(o => o.id_operacao == id);
         document.getElementById('edit-id').value = id;
         document.getElementById('edit-lucro-bruto').value = this.formatCurrency(op.lucro_bruto_recebido);
-        document.getElementById('edit-status').value = op.status;
+        document.getElementById('edit-data-fim').value = op.data_fim || '';
+        // Preenche os campos manuais com o que já estiver salvo na planilha
+        document.getElementById('edit-lucro-guardado').value = this.formatCurrency(op.lucro_guardado);
+        document.getElementById('edit-lucro-parcela').value = this.formatCurrency(op.lucro_usado_parcela);
+        document.getElementById('edit-lucro-pessoal').value = this.formatCurrency(op.lucro_gastos_pessoais);
+        
+        // Define "Finalizada" como padrão ao abrir, agilizando o fechamento da operação
+        document.getElementById('edit-status').value = 'Finalizada';
+        
+        this.toggleEditProfitFields();
         document.getElementById('edit-modal').classList.remove('hidden');
+    },
+
+    toggleEditProfitFields() {
+        const status = document.getElementById('edit-status').value;
+        const isFinalizada = status === 'Finalizada';
+        
+        const fields = [
+            'edit-lucro-bruto', 
+            'edit-data-fim', 
+            'edit-lucro-guardado', 
+            'edit-lucro-parcela', 
+            'edit-lucro-pessoal'
+        ];
+
+        fields.forEach(id => {
+            const el = document.getElementById(id);
+            el.disabled = !isFinalizada;
+            if (!isFinalizada) {
+                el.value = ''; // Limpa se voltar para Em Andamento
+                el.style.opacity = '0.5';
+            } else {
+                el.style.opacity = '1';
+            }
+        });
     },
 
     async handleUpdate(e) {
         e.preventDefault();
         const id = document.getElementById('edit-id').value;
+        const status = document.getElementById('edit-status').value;
+        const dataFim = document.getElementById('edit-data-fim').value;
+
         const lucroBruto = this.parseCurrency(document.getElementById('edit-lucro-bruto').value);
-        
-        // Lógica de Rateio (1/3 para cada)
-        const rateio = lucroBruto / 3;
+        const lucroReserva = this.parseCurrency(document.getElementById('edit-lucro-guardado').value);
+        const lucroBanco = this.parseCurrency(document.getElementById('edit-lucro-parcela').value);
+        const lucroPessoal = this.parseCurrency(document.getElementById('edit-lucro-pessoal').value);
+
+        // Validação obrigatória para status Finalizada
+        if (status === 'Finalizada') {
+            if (!lucroBruto || !dataFim || (lucroReserva + lucroBanco + lucroPessoal === 0)) {
+                return this.showAlert('Para finalizar, preencha o lucro bruto, a data e a distribuição do lucro.', 'DADOS INCOMPLETOS', 'error');
+            }
+            if (Math.abs(lucroBruto - (lucroReserva + lucroBanco + lucroPessoal)) > 0.01) {
+                return this.showAlert('A soma das distribuições deve ser igual ao lucro bruto.', 'ERRO DE RATEIO', 'error');
+            }
+        }
 
         const payload = {
             id_operacao: id,
             lucro_bruto_recebido: lucroBruto,
-            lucro_guardado: rateio.toFixed(2),
-            lucro_usado_parcela: rateio.toFixed(2),
-            lucro_gastos_pessoais: rateio.toFixed(2),
-            status: document.getElementById('edit-status').value
+            lucro_guardado: lucroReserva.toFixed(2),
+            lucro_usado_parcela: lucroBanco.toFixed(2),
+            lucro_gastos_pessoais: lucroPessoal.toFixed(2),
+            status: status,
+            data_fim: dataFim
         };
 
         const res = await fetch('/api/update-data', {
@@ -311,6 +437,45 @@ const app = {
 
     closeModal() { document.getElementById('edit-modal').classList.add('hidden'); },
 
+    openDeleteModal(id) {
+        this.state.deletingId = id;
+        document.getElementById('delete-modal').classList.remove('hidden');
+    },
+
+    closeDeleteModal() {
+        this.state.deletingId = null;
+        document.getElementById('delete-modal').classList.add('hidden');
+    },
+
+    async handleDelete() {
+        if (!this.state.deletingId) return;
+        
+        const btn = document.getElementById('btn-confirm-delete');
+        const originalContent = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Excluindo...';
+        btn.style.pointerEvents = 'none';
+
+        const res = await fetch('/api/delete-data', {
+            method: 'DELETE',
+            headers: { 
+                'Authorization': sessionStorage.getItem('sniper_token'),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ id_operacao: this.state.deletingId })
+        });
+
+        btn.innerHTML = originalContent;
+        btn.style.pointerEvents = 'auto';
+        this.closeDeleteModal();
+
+        if (res.ok) {
+            this.showAlert('A operação foi removida permanentemente.', 'EXCLUÍDO', 'success');
+            this.loadData();
+        } else {
+            this.showAlert('Erro ao tentar excluir os dados na planilha.', 'ERRO', 'error');
+        }
+    },
+
     openInfoModal() { 
         // Sincroniza o valor do input com a meta salva no estado antes de abrir
         const input = document.getElementById('input-meta-objetivo');
@@ -324,6 +489,50 @@ const app = {
         document.getElementById('input-meta-objetivo').value = this.formatCurrency(this.state.metaFixa);
         this.toggleEditMeta(false); // Garante que o campo volte a ser apenas leitura ao fechar
     },
+
+    openKpiInfo(key) {
+        const definitions = {
+            'total-lucro-bruto': {
+                title: 'TOTAL LUCRO BRUTO',
+                text: 'Soma absoluta de todo o lucro bruto recebido através das operações finalizadas. É o montante total gerado antes de qualquer distribuição.'
+            },
+            'avg-lucro-bruto': {
+                title: 'MÉDIA LUCRO BRUTO',
+                text: 'Valor médio de lucro gerado por cada operação concluída. Ajuda a identificar o potencial de ganho esperado para cada novo investimento.'
+            },
+            'lucro-guardado': {
+                title: 'LUCRO LÍQUIDO GUARDADO',
+                text: 'Valor acumulado que você destinou especificamente para sua reserva ou meta principal. É este valor que preenche a barra de progresso.'
+            },
+            'uso-pessoal': {
+                title: 'LUCRO LÍQUIDO USO PESSOAL',
+                text: 'Montante acumulado que foi retirado do lucro das operações para uso livre, recompensas pessoais ou gastos fora do capital de giro.'
+            },
+            'capital-ativo': {
+                title: 'CAPITAL ATIVO NA RUA',
+                text: 'Total do capital principal (valor emprestado) que está atualmente em operações abertas. Representa o seu dinheiro que está trabalhando no momento.'
+            },
+            'roi-medio': {
+                title: 'ROI MÉDIO',
+                text: 'Retorno Sobre Investimento médio das operações finalizadas. Indica a rentabilidade percentual histórica do seu capital.'
+            },
+            'ciclo-retorno': {
+                title: 'CICLO MÉDIO DE RETORNO',
+                text: 'Tempo médio (em dias) decorrido entre o início de uma operação e o seu recebimento total. Mede a velocidade de giro do seu capital.'
+            },
+            'lucro-projetado': {
+                title: 'LUCRO BRUTO PROJETADO',
+                text: 'Uma estimativa baseada no seu ROI Médio histórico aplicada ao Capital Ativo. Indica quanto lucro deve retornar para você em breve.'
+            }
+        };
+
+        const info = definitions[key];
+        document.getElementById('kpi-info-title').innerText = info.title;
+        document.getElementById('kpi-info-body').innerText = info.text;
+        document.getElementById('kpi-info-modal').classList.remove('hidden');
+    },
+
+    closeKpiInfo() { document.getElementById('kpi-info-modal').classList.add('hidden'); },
 
     toggleEditMeta(active) {
         const input = document.getElementById('input-meta-objetivo');
