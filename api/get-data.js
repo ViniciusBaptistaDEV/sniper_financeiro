@@ -12,7 +12,7 @@ module.exports = async function handler(req, res) {
         const sheetConfig = doc.sheetsByTitle['Config'];
 
         if (!sheetCaps || !sheetOps) {
-            throw new Error("Abas 'Captacoes' ou 'Operacoes' não encontradas na planilha. Verifique os nomes das abas.");
+            throw new Error("Abas 'Captacoes' ou 'Operacoes' não encontradas no sistema. Verifique os nomes das abas.");
         }
 
         const captacoes = await sheetCaps.getRows();

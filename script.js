@@ -126,7 +126,7 @@ const app = {
             this.renderEarnings();
         } catch (error) {
             console.error("Falha ao carregar dados:", error);
-            this.showAlert('Não foi possível sincronizar os dados com a planilha.', 'ERRO DE CONEXÃO', 'error');
+            this.showAlert('Não foi possível sincronizar os dados no sistema.', 'ERRO DE CONEXÃO', 'error');
         } finally {
             // Pequeno delay apenas para a animação não "piscar" em conexões muito rápidas
             setTimeout(() => this.hideLoading(), 500);
@@ -145,10 +145,16 @@ const app = {
         const capitalAtivo = ops.filter(o => o.status === 'Em Andamento')
                                 .reduce((acc, curr) => acc + (parseFloat(curr.valor_emprestado) || 0), 0);
         
-        // ROI Médio (Lucro Bruto / Valor Emprestado)
+        // Cálculos baseados em operações concluídas
         const opsFinalizadas = ops.filter(o => o.status === 'Finalizada');
+
+        // ROI Médio: soma do (lucro / investimento) de cada op finalizada / total de ops
         const roiMedio = opsFinalizadas.length > 0 
-            ? (opsFinalizadas.reduce((acc, curr) => acc + (curr.lucro_bruto_recebido / curr.valor_emprestado), 0) / opsFinalizadas.length) * 100 
+            ? (opsFinalizadas.reduce((acc, curr) => {
+                const lucro = parseFloat(curr.lucro_bruto_recebido) || 0;
+                const investimento = parseFloat(curr.valor_emprestado) || 1; // evita divisão por zero
+                return acc + (lucro / investimento);
+            }, 0) / opsFinalizadas.length) * 100 
             : 0;
 
         const avgLucroBruto = opsFinalizadas.length > 0 ? (totalLucroBruto / opsFinalizadas.length) : 0;
@@ -333,12 +339,12 @@ const app = {
         });
 
         if (res.ok) {
-            this.showAlert('Os dados foram registrados na planilha com sucesso.', 'REGISTRO SALVO', 'success');
+            this.showAlert('Os dados foram registrados no sistema com sucesso.', 'REGISTRO SALVO', 'success');
             this.loadData();
             e.target.reset();
             this.toggleFormFields(); // Reseta os campos dinâmicos para o estado inicial
         } else {
-            this.showAlert('Erro ao salvar os dados na planilha.', 'ERRO', 'error');
+            this.showAlert('Erro ao salvar os dados no sistema.', 'ERRO', 'error');
         }
 
         // Reverter estado do botão
@@ -350,12 +356,11 @@ const app = {
     openEditModal(id) {
         const op = this.state.data.operacoes.find(o => o.id_operacao == id);
         document.getElementById('edit-id').value = id;
-        document.getElementById('edit-lucro-bruto').value = this.formatCurrency(op.lucro_bruto_recebido);
+        document.getElementById('edit-lucro-bruto').value = this.formatCurrency(0);
         document.getElementById('edit-data-fim').value = op.data_fim || '';
-        // Preenche os campos manuais com o que já estiver salvo na planilha
-        document.getElementById('edit-lucro-guardado').value = this.formatCurrency(op.lucro_guardado);
-        document.getElementById('edit-lucro-parcela').value = this.formatCurrency(op.lucro_usado_parcela);
-        document.getElementById('edit-lucro-pessoal').value = this.formatCurrency(op.lucro_gastos_pessoais);
+        document.getElementById('edit-lucro-guardado').value = this.formatCurrency(0);
+        document.getElementById('edit-lucro-parcela').value = this.formatCurrency(0);
+        document.getElementById('edit-lucro-pessoal').value = this.formatCurrency(0);
         
         // Define "Finalizada" como padrão ao abrir, agilizando o fechamento da operação
         document.getElementById('edit-status').value = 'Finalizada';
@@ -398,14 +403,16 @@ const app = {
         const lucroReserva = this.parseCurrency(document.getElementById('edit-lucro-guardado').value);
         const lucroBanco = this.parseCurrency(document.getElementById('edit-lucro-parcela').value);
         const lucroPessoal = this.parseCurrency(document.getElementById('edit-lucro-pessoal').value);
+        const somaDistribuicao = lucroReserva + lucroBanco + lucroPessoal;
 
         // Validação obrigatória para status Finalizada
         if (status === 'Finalizada') {
-            if (!lucroBruto || !dataFim || (lucroReserva + lucroBanco + lucroPessoal === 0)) {
+            if (!lucroBruto || !dataFim || (somaDistribuicao === 0)) {
                 return this.showAlert('Para finalizar, preencha o lucro bruto, a data e a distribuição do lucro.', 'DADOS INCOMPLETOS', 'error');
             }
-            if (Math.abs(lucroBruto - (lucroReserva + lucroBanco + lucroPessoal)) > 0.01) {
-                return this.showAlert('A soma das distribuições deve ser igual ao lucro bruto.', 'ERRO DE RATEIO', 'error');
+            
+            if (Math.abs(lucroBruto - somaDistribuicao) > 0.01) {
+                return this.showAlert(`A soma da distribuição (R$ ${this.formatCurrency(somaDistribuicao)}) deve ser igual ao lucro bruto (R$ ${this.formatCurrency(lucroBruto)}). Por favor, ajuste os valores.`, 'ERRO DE DISTRIBUIÇÃO DO LUCRO', 'error');
             }
         }
 
@@ -419,19 +426,42 @@ const app = {
             data_fim: dataFim
         };
 
-        const res = await fetch('/api/update-data', {
-            method: 'PUT',
-            headers: { 
-                'Authorization': sessionStorage.getItem('sniper_token'),
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
+        const btn = e.target.querySelector('button[type="submit"]');
+        const originalContent = btn.innerHTML;
 
-        if (res.ok) {
-            this.closeModal();
-            this.showAlert('A operação foi atualizada com os novos valores de rateio.', 'SUCESSO', 'success');
-            this.loadData();
+        // Estado de carregamento no botão
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando...';
+        btn.style.pointerEvents = 'none';
+        btn.style.opacity = '0.7';
+
+        try {
+            const res = await fetch('/api/update-data', {
+                method: 'PUT',
+                headers: { 
+                    'Authorization': sessionStorage.getItem('sniper_token'),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (res.ok) {
+                this.closeModal();
+                const successMsg = status === 'Finalizada' 
+                    ? 'A operação foi atualizada com os valores de distribuição de lucros.' 
+                    : 'A operação foi atualizada com sucesso para Em Andamento.';
+                
+                this.showAlert(successMsg, 'SUCESSO', 'success');
+                this.loadData();
+            } else {
+                this.showAlert('Erro ao tentar atualizar os dados no sistema.', 'ERRO', 'error');
+            }
+        } catch (error) {
+            this.showAlert('Erro de conexão com o servidor.', 'ERRO', 'error');
+        } finally {
+            // Reverte o estado do botão independentemente do resultado
+            btn.innerHTML = originalContent;
+            btn.style.pointerEvents = 'auto';
+            btn.style.opacity = '1';
         }
     },
 
@@ -452,27 +482,35 @@ const app = {
         
         const btn = document.getElementById('btn-confirm-delete');
         const originalContent = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Excluindo...';
+        
+        // Estado de carregamento
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Removendo...';
         btn.style.pointerEvents = 'none';
+        btn.style.opacity = '0.7';
 
-        const res = await fetch('/api/delete-data', {
-            method: 'DELETE',
-            headers: { 
-                'Authorization': sessionStorage.getItem('sniper_token'),
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ id_operacao: this.state.deletingId })
-        });
+        try {
+            const res = await fetch('/api/delete-data', {
+                method: 'DELETE',
+                headers: { 
+                    'Authorization': sessionStorage.getItem('sniper_token'),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ id_operacao: this.state.deletingId })
+            });
 
-        btn.innerHTML = originalContent;
-        btn.style.pointerEvents = 'auto';
-        this.closeDeleteModal();
-
-        if (res.ok) {
-            this.showAlert('A operação foi removida permanentemente.', 'EXCLUÍDO', 'success');
-            this.loadData();
-        } else {
-            this.showAlert('Erro ao tentar excluir os dados na planilha.', 'ERRO', 'error');
+            if (res.ok) {
+                this.closeDeleteModal();
+                this.showAlert('A operação foi removida permanentemente.', 'EXCLUÍDO', 'success');
+                this.loadData();
+            } else {
+                this.showAlert('Erro ao tentar excluir os dados no sistema.', 'ERRO', 'error');
+            }
+        } catch (error) {
+            this.showAlert('Erro de conexão ao tentar excluir.', 'ERRO', 'error');
+        } finally {
+            btn.innerHTML = originalContent;
+            btn.style.pointerEvents = 'auto';
+            btn.style.opacity = '1';
         }
     },
 
@@ -578,7 +616,7 @@ const app = {
             this.showAlert('A meta do objetivo foi atualizada com sucesso.', 'CONFIGURAÇÃO SALVA', 'success');
             this.toggleEditMeta(false);
         } else {
-            this.showAlert('Erro ao salvar a nova meta na planilha.', 'ERRO', 'error');
+            this.showAlert('Erro ao salvar a nova meta no sistema.', 'ERRO', 'error');
         }
 
         // Reverter estado do botão
