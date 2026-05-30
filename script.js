@@ -228,9 +228,12 @@ const app = {
                 const end = new Date(op.data_fim + 'T00:00:00');
                 durationText = `${Math.floor((end - start) / 86400000)} dias`;
             }
+            const tipoLabel = op.tipo_aplicacao === 'emprestimo' ? 'Empréstimo' : (op.tipo_aplicacao === 'aquisicao' ? 'Aquisição' : '-');
+            const badgeColor = op.tipo_aplicacao === 'emprestimo' ? 'blue' : (op.tipo_aplicacao === 'aquisicao' ? 'purple' : '');
             return `
             <tr>
                 <td data-label="Início">${op.data_inicio ? new Date(op.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                <td data-label="Tipo"><span class="badge ${badgeColor}">${tipoLabel}</span></td>
                 <td data-label="Destino">
                     ${op.beneficiario_ou_item || '-'}
                     ${op.observacao ? `<i class="fas fa-comment-dots info-trigger" style="margin-left: 5px; color: var(--neon-blue);" onclick="app.showAlert('${op.observacao}', 'OBSERVAÇÃO DA AQUISIÇÃO')"></i>` : ''}
@@ -238,7 +241,7 @@ const app = {
                 <td data-label="Fim">${op.status === 'Finalizada' ? (op.data_fim ? new Date(op.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '-') : '<span style="font-size: 0.75rem; opacity: 0.7; font-style: italic;">Aguardando finalização...</span>'}</td>
                 <td data-label="Valor">R$ ${this.formatCurrency(op.valor_emprestado)}</td>
                 <td data-label="Lucro Bruto">R$ ${this.formatCurrency(op.lucro_bruto_recebido)}</td>
-                <td data-label="Status"><span class="badge ${op.status === 'Finalizada' ? 'green' : 'blue'}">${op.status}</span></td>
+                <td data-label="Status"><span class="badge ${op.status === 'Finalizada' ? 'green' : 'yellow'}">${op.status}</span></td>
                 <td data-label="Duração">${durationText}</td>
                 <td data-label="Ações" class="table-actions">
                     <button class="action-btn edit-btn" onclick="app.openEditModal('${op.id_operacao}')" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
@@ -262,7 +265,7 @@ const app = {
                 <td data-label="Venc.">${c.dia_vencimento || '-'}</td>
                 <td data-label="Vl. Parcela">R$ ${this.formatCurrency(c.valor_parcela)}</td>
                 <td data-label="Progresso">${c.parcelas_pagas || 0} / ${c.qtd_parcelas || 0}</td>
-                <td data-label="Status"><span class="badge ${quitado ? 'green' : 'orange'}">${quitado ? 'Quitado' : 'Ativo'}</span></td>
+                <td data-label="Status"><span class="badge ${quitado ? 'green' : 'yellow'}">${quitado ? 'Quitado' : 'Ativo'}</span></td>
                 <td data-label="Ações" class="table-actions">
                     <button class="action-btn edit-btn" onclick="app.openEditCaptacaoModal('${c.id_captacao}')" title="Editar" style="color: var(--neon-blue)"><i class="fa-solid fa-pen-to-square"></i></button>
                     <button class="action-btn delete-btn" onclick="app.openDeleteModal('${c.id_captacao}', 'captacao')" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>

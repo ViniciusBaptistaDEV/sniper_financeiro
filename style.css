@@ -11,6 +11,7 @@
     --neon-blue: #00d4ff;
     --neon-yellow: #f39c12;
     --neon-orange: #e67e22;
+    --neon-purple: #bc13fe;
     --text-white: #ffffff;
     --text-gray: #a0a0a0;
 }
@@ -19,6 +20,7 @@ html,
 body {
     font-family: 'Inter', sans-serif;
     background-color: var(--bg-dark);
+    font-size: 14px;
     color: var(--text-white);
     overflow-x: hidden;
     max-width: 100%;
@@ -145,7 +147,7 @@ button:active {
 
 .sidebar .logo {
     font-weight: 700;
-    font-size: 1.1rem;
+    font-size: 1.3rem;
     margin-bottom: 2rem;
     color: var(--neon-green);
     display: flex;
@@ -374,8 +376,50 @@ button:active {
 
 /* Tables */
 table { width: 100%; border-collapse: collapse; background: var(--card-bg); border-radius: 8px; }
-th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #222; }
+th, td { padding: 0.6rem; text-align: left; border-bottom: 1px solid #222; }
 th { color: var(--text-gray); font-weight: 400; }
+
+/* Badges / Selos Coloridos */
+.badge {
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-block;
+    white-space: nowrap;
+}
+
+.badge.blue {
+    background: rgba(0, 212, 255, 0.15);
+    color: var(--neon-blue);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+}
+
+.badge.yellow {
+    background: rgba(243, 156, 18, 0.15);
+    color: var(--neon-yellow);
+    border: 1px solid rgba(243, 156, 18, 0.3);
+}
+
+.badge.orange {
+    background: rgba(230, 126, 34, 0.15);
+    color: var(--neon-orange);
+    border: 1px solid rgba(230, 126, 34, 0.3);
+}
+
+.badge.purple {
+    background: rgba(188, 19, 254, 0.15);
+    color: var(--neon-purple);
+    border: 1px solid rgba(188, 19, 254, 0.3);
+}
+
+.badge.green {
+    background: rgba(0, 255, 136, 0.15);
+    color: var(--neon-green);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+}
 
 /* Alinhamento das ações */
 .table-actions {
