@@ -147,7 +147,7 @@ const app = {
         this.state.data.captacoes.forEach(c => {
             const opt = document.createElement('option');
             opt.value = c.id_captacao;
-            opt.innerText = `Captação #${c.id_captacao} (R$ ${this.formatCurrency(c.valor_pegado)})`;
+            opt.innerText = `Captação ${c.id_captacao} (R$ ${this.formatCurrency(c.valor_pegado)})`;
             select.appendChild(opt);
         });
 
@@ -232,6 +232,7 @@ const app = {
             const badgeColor = op.tipo_aplicacao === 'emprestimo' ? 'blue' : (op.tipo_aplicacao === 'aquisicao' ? 'purple' : '');
             return `
             <tr>
+                <td data-label="ID">${op.id_operacao}</td>
                 <td data-label="Início">${op.data_inicio ? new Date(op.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
                 <td data-label="Tipo"><span class="badge ${badgeColor}">${tipoLabel}</span></td>
                 <td data-label="Destino">
@@ -258,8 +259,9 @@ const app = {
             const quitado = String(c.quitamento_parcelas) === 'true';
             return `
             <tr>
-                <td data-label="Origem"><span class="badge ${c.origem === 'proprio' ? 'green' : 'blue'}">${c.origem === 'proprio' ? 'Próprio' : 'Banco'}</span></td>
+                <td data-label="ID">${c.id_captacao}</td>
                 <td data-label="Data">${c.data_emprestimo ? new Date(c.data_emprestimo + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                <td data-label="Origem"><span class="badge ${c.origem === 'proprio' ? 'green' : 'blue'}">${c.origem === 'proprio' ? 'Próprio' : 'Banco'}</span></td>
                 <td data-label="Valor Principal">R$ ${this.formatCurrency(c.valor_pegado)}</td>
                 <td data-label="Total c/ Juros">R$ ${this.formatCurrency(c.total_com_juros)}</td>
                 <td data-label="Venc.">${c.dia_vencimento || '-'}</td>
@@ -267,7 +269,7 @@ const app = {
                 <td data-label="Progresso">${c.parcelas_pagas || 0} / ${c.qtd_parcelas || 0}</td>
                 <td data-label="Status"><span class="badge ${quitado ? 'green' : 'yellow'}">${quitado ? 'Quitado' : 'Ativo'}</span></td>
                 <td data-label="Ações" class="table-actions">
-                    <button class="action-btn edit-btn" onclick="app.openEditCaptacaoModal('${c.id_captacao}')" title="Editar" style="color: var(--neon-blue)"><i class="fa-solid fa-pen-to-square"></i></button>
+                    <button class="action-btn edit-btn" onclick="app.openEditCaptacaoModal('${c.id_captacao}')" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
                     <button class="action-btn delete-btn" onclick="app.openDeleteModal('${c.id_captacao}', 'captacao')" title="Excluir"><i class="fa-solid fa-trash-can"></i></button>
                 </td>
             </tr>
@@ -287,6 +289,7 @@ const app = {
             const duration = Math.floor((end - start) / 86400000);
             return `
             <tr>
+                <td data-label="ID">${op.id_operacao}</td>
                 <td data-label="Início">${op.data_inicio ? new Date(op.data_inicio + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
                 <td data-label="Fim">${op.data_fim ? new Date(op.data_fim + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
                 <td data-label="Lucro Bruto" style="color: var(--neon-green)">R$ ${this.formatCurrency(op.lucro_bruto_recebido)}</td>
@@ -476,7 +479,7 @@ const app = {
                     <input type="hidden" name="quitamento_parcelas" value="false">
                 `;
             } else {
-                const options = this.state.data.captacoes.map(c => `<option value="${c.id_captacao}">Captação #${c.id_captacao} (R$ ${this.formatCurrency(c.valor_pegado)})</option>`).join('');
+                const options = this.state.data.captacoes.map(c => `<option value="${c.id_captacao}">Captação ${c.id_captacao} (R$ ${this.formatCurrency(c.valor_pegado)})</option>`).join('');
                 container.innerHTML = `
                     <div class="input-group" style="margin-bottom: 5px;">
                         <label>Vincular à Captação</label>

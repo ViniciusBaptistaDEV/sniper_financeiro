@@ -13,8 +13,11 @@ module.exports = async function handler(req, res) {
 
         if (body.type === 'captacao') {
             const sheet = doc.sheetsByTitle['Captacoes'];
+            const rows = await sheet.getRows();
+            const nextId = rows.length > 0 ? Math.max(...rows.map(r => parseInt(r.get('id_captacao')) || 0)) + 1 : 1;
+
             await sheet.addRow({
-                id_captacao: Date.now().toString(),
+                id_captacao: nextId.toString(),
                 origem: body.origem || 'banco',
                 data_emprestimo: body.data_emprestimo,
                 valor_pegado: body.valor_pegado,
@@ -42,9 +45,11 @@ module.exports = async function handler(req, res) {
                 return res.status(400).json({ error: 'Saldo insuficiente nesta captação para realizar a operação.' });
             }
 
+            const nextId = opsRows.length > 0 ? Math.max(...opsRows.map(r => parseInt(r.get('id_operacao')) || 0)) + 1 : 1;
+
             const sheet = doc.sheetsByTitle['Operacoes'];
             await sheet.addRow({
-                id_operacao: Date.now().toString(),
+                id_operacao: nextId.toString(),
                 id_captacao_ref: body.id_captacao_ref,
                 data_inicio: body.data_inicio,
                 tipo_aplicacao: body.tipo_aplicacao,

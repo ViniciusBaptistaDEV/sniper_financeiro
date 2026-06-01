@@ -452,13 +452,13 @@ th { color: var(--text-gray); font-weight: 400; }
 }
 
 .edit-btn {
-    color: var(--neon-green);
-    filter: drop-shadow(0 0 5px rgba(0, 255, 136, 0.4));
+    color: var(--neon-blue);
+    filter: drop-shadow(0 0 5px rgba(0, 212, 255, 0.4));
 }
 
 .edit-btn:hover {
     transform: scale(1.2) rotate(-5deg);
-    filter: drop-shadow(0 0 10px var(--neon-green));
+    filter: drop-shadow(0 0 10px var(--neon-blue));
     color: #fff;
 }
 
