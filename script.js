@@ -978,6 +978,7 @@ const app = {
 
     logout() {
         sessionStorage.removeItem('sniper_token');
+        localStorage.removeItem('sniper_token');
         this.state.isLoggingOut = true;
         this.showAlert('Sua sessão foi encerrada com segurança.', 'SAÍDA COM SUCESSO', 'success');
     }
